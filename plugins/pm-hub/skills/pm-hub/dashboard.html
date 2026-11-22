@@ -41,7 +41,9 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:10px;
 .tile.hot{border-color:var(--warn);background:var(--warn-soft)}
 .chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:11.5px;white-space:nowrap;font-weight:500}
 .s-진행{background:var(--accent-soft);color:var(--accent)}
-.s-검증{background:var(--accent-soft);color:var(--accent)}
+.s-검수,.s-검수중{background:var(--accent-soft);color:var(--accent)}
+.s-통과{background:var(--ok-soft);color:var(--ok)}
+.s-반려{background:var(--bad-soft);color:var(--bad)}
 .s-완료{background:var(--ok-soft);color:var(--ok)}
 .s-대표{background:var(--warn-soft);color:var(--warn)}
 .s-막힘{background:var(--bad-soft);color:var(--bad)}
@@ -121,8 +123,8 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
 
   <section aria-labelledby="h-todo">
     <h2 id="h-todo">할 일과 예상 시간 <span class="n" id="n-todo"></span></h2>
-    <div class="tbl"><table><thead><tr><th>할 일</th><th>프로젝트</th><th>상태</th><th>담당</th><th>모델 · 노력</th><th>예상</th><th>실제</th><th>근거</th></tr></thead><tbody id="todo"><tr><td colspan="8" class="empty">할 일이 올라오면 예상 시간과 실제 걸린 시간을 함께 보여 줍니다.</td></tr></tbody></table></div>
-    <p class="note">예상은 비슷한 일의 실제 시간을 보고 PM 이 고칩니다. 시간 단위는 시간(h)입니다. 모델 · 노력은 진행 방식(가성비 · 결과우선)과 일 종류(A 단순 ~ E 설계·검수)로 정하며, 표보다 높게 쓰지 않습니다.</p>
+    <div class="tbl"><table><thead><tr><th>할 일</th><th>프로젝트</th><th>상태</th><th>담당</th><th>모델 · 노력</th><th>예상</th><th>실제</th><th>검수</th><th>근거</th></tr></thead><tbody id="todo"><tr><td colspan="9" class="empty">할 일이 올라오면 예상 시간과 실제 걸린 시간을 함께 보여 줍니다.</td></tr></tbody></table></div>
+    <p class="note">예상은 비슷한 일의 실제 시간을 보고 PM 이 고칩니다. 시간 단위는 시간(h)입니다. 모델 · 노력은 진행 방식(가성비 · 결과우선)과 일 종류(A 단순 ~ E 설계·검수)로 정하며, 표보다 높게 쓰지 않습니다. 할 일마다 작업한 세션이 아닌 별도 검수 세션이 확인해야 「완료」가 됩니다.</p>
   </section>
 
   <div class="grid2">
@@ -140,8 +142,8 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
 <script>
 (function(){
   const $=id=>document.getElementById(id);
-  const ST=["진행","검증","대표","막힘","대기","보류","완료","보관"];
-  const COLOR={"진행":"var(--accent)","검증":"var(--accent)","대표":"var(--warn)","막힘":"var(--bad)","대기":"var(--idle)","보류":"var(--idle)","완료":"var(--ok)","보관":"var(--idle)"};
+  const ST=["진행","검수","대표","막힘","대기","보류","완료","보관"];
+  const COLOR={"진행":"var(--accent)","검수":"var(--accent)","대표":"var(--warn)","막힘":"var(--bad)","대기":"var(--idle)","보류":"var(--idle)","완료":"var(--ok)","보관":"var(--idle)"};
   const S={meta:null,projects:[],tasks:[],asks:[],sessions:[],glossary:[],log:[]};
   let gotFresh=false;
 
@@ -159,6 +161,7 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
   function link(u,t){return /^https:\/\//.test(u||"")?'<a href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(t||u)+'</a>':esc(t||u||"")}
   const KIND={A:"단순",B:"조사·문서",C:"일반 개발",D:"위험 개발",E:"설계·검수"};
   function me(x){if(!x.model&&!x.effort)return '<span class="note">–</span>';return '<span class="tag">'+esc([x.model,x.effort].filter(Boolean).join(" · "))+'</span>'+(x.kind?'<div class="note">'+esc(x.kind)+' '+esc(KIND[x.kind]||"")+'</div>':'')}
+  function rv(t){if(!t.review)return '<span class="note">–</span>';const c=t.review.replace(/\s/g,"");return '<span class="chip s-'+esc(c)+'">'+esc(t.review)+'</span>'+(t.reviewer?'<div class="note">'+esc(t.reviewer)+'</div>':'')+(t.review_note?'<div class="note">'+rich(t.review_note)+'</div>':'')}
   const ord=a=>a.slice().sort((x,y)=>(x.order??999)-(y.order??999)||String(x.id).localeCompare(String(y.id)));
 
   function renderAsks(){
@@ -171,7 +174,7 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
       (a.why?'<br>'+rich(a.why):'')+'</div></div>').join("");
   }
   function renderTiles(){
-    const working=S.sessions.filter(s=>s.status==="진행"||s.status==="검증").length;
+    const working=S.sessions.filter(s=>s.status==="진행"||s.status==="검수").length;
     const asks=S.asks.filter(a=>a.status!=="답함"&&a.status!=="끝").length;
     const remain=S.tasks.filter(t=>t.status!=="완료"&&t.status!=="보관").reduce((n,t)=>n+Math.max(0,(Number(t.est_h)||0)-(Number(t.spent_h)||0)),0);
     const done=S.tasks.filter(t=>t.status==="완료").length;
@@ -183,7 +186,7 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
     return '<span class="bar" aria-hidden="true">'+ST.map(st=>{const n=list.filter(t=>(t.status||"대기")===st).length;return n?'<i style="width:'+(n/tot*100)+'%;background:'+COLOR[st]+'"></i>':''}).join("")+'</span>';
   }
   function renderTree(){
-    $("legend").innerHTML=["진행","대표","막힘","대기","완료"].map(chip).join("");
+    $("legend").innerHTML=["진행","검수","대표","막힘","대기","완료"].map(chip).join("");
     const projs=ord(S.projects);
     if(!projs.length){$("tree").innerHTML='<li class="empty">프로젝트와 업무가 올라오면 위아래 관계를 그림으로 보여 줍니다.</li>';return}
     const kids=pid=>ord(S.tasks.filter(t=>(t.parent||null)===pid));
@@ -215,7 +218,7 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
     const pn=id=>(S.projects.find(p=>p.id===id)||{}).name||"";
     $("n-todo").textContent=rows.length?rows.length+"건":"";
     if(!rows.length)return;
-    $("todo").innerHTML=rows.map(t=>'<tr><td>'+rich(t.title)+'</td><td>'+esc(pn(t.project))+'</td><td>'+chip(t.status)+'</td><td>'+esc(t.session||"")+'</td><td>'+me(t)+'</td><td class="num">'+h(t.est_h)+'</td><td class="num">'+h(t.spent_h)+'</td><td>'+(t.evidence?rich(t.evidence):(t.pr?link(t.pr_url,t.pr):""))+'</td></tr>').join("");
+    $("todo").innerHTML=rows.map(t=>'<tr><td>'+rich(t.title)+'</td><td>'+esc(pn(t.project))+'</td><td>'+chip(t.status)+'</td><td>'+esc(t.session||"")+'</td><td>'+me(t)+'</td><td class="num">'+h(t.est_h)+'</td><td class="num">'+h(t.spent_h)+'</td><td>'+rv(t)+'</td><td>'+(t.evidence?rich(t.evidence):(t.pr?link(t.pr_url,t.pr):""))+'</td></tr>').join("");
   }
   function renderGlossary(){
     const rows=S.glossary.slice().sort((a,b)=>String(a.term).localeCompare(String(b.term),"ko"));
