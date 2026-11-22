@@ -1,0 +1,258 @@
+<title>PM 총괄판</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 레이아웃: 위에서 아래로 「정하실 것 → 요약 → 업무 나무 → 세션 → 할 일 → 용어집 → 기록」, 넓으면 2단 */
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --fg:#1b2230; --muted:#5d6779; --line:#dde1e8;
+  --accent:#2c5fc9; --accent-soft:#e6edfb;
+  --ok:#1f8a5b; --ok-soft:#e3f4ec; --warn:#b26a00; --warn-soft:#fbefdc;
+  --bad:#c23b3b; --bad-soft:#fae6e6; --idle:#7a8496; --idle-soft:#eceef2;
+  --sans:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --panel:#1a2029; --fg:#e6e9ef; --muted:#9aa3b3; --line:#2b3340;
+  --accent:#7ea2f0; --accent-soft:#1f2b44;
+  --ok:#5cc79a; --ok-soft:#173327; --warn:#e3a650; --warn-soft:#3a2c15;
+  --bad:#ef7d7d; --bad-soft:#3d1d1d; --idle:#8d96a7; --idle-soft:#242a35; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --panel:#1a2029; --fg:#e6e9ef; --muted:#9aa3b3; --line:#2b3340;
+  --accent:#7ea2f0; --accent-soft:#1f2b44;
+  --ok:#5cc79a; --ok-soft:#173327; --warn:#e3a650; --warn-soft:#3a2c15;
+  --bad:#ef7d7d; --bad-soft:#3d1d1d; --idle:#8d96a7; --idle-soft:#242a35; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.55}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px}
+h1{font-size:22px;margin:0;text-wrap:balance}
+h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+h2 .n{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:400}
+.sub{color:var(--muted);font-size:12.5px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.grid2{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:620px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel)}
+.tile b{display:block;font-size:24px;font-variant-numeric:tabular-nums;line-height:1.2}
+.tile span{color:var(--muted);font-size:12px}
+.tile.hot{border-color:var(--warn);background:var(--warn-soft)}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:11.5px;white-space:nowrap;font-weight:500}
+.s-진행{background:var(--accent-soft);color:var(--accent)}
+.s-검증{background:var(--accent-soft);color:var(--accent)}
+.s-완료{background:var(--ok-soft);color:var(--ok)}
+.s-대표{background:var(--warn-soft);color:var(--warn)}
+.s-막힘{background:var(--bad-soft);color:var(--bad)}
+.s-대기,.s-보류,.s-보관{background:var(--idle-soft);color:var(--idle)}
+.asks{display:flex;flex-direction:column;gap:10px}
+.ask{border-left:4px solid var(--warn);background:var(--warn-soft);border-radius:6px;padding:10px 12px}
+.ask .q{font-weight:700}
+.ask .meta{color:var(--muted);font-size:12px;margin-top:4px}
+.ask .rec{margin-top:4px;font-size:13px}
+.empty{color:var(--muted);font-size:13px;padding:6px 0}
+/* 업무 나무 */
+.tree,.tree ul{list-style:none;margin:0;padding:0}
+.tree ul{margin-left:14px;padding-left:14px;border-left:1px dashed var(--line)}
+.tree li{position:relative;padding:4px 0}
+.tree ul>li::before{content:"";position:absolute;left:-14px;top:15px;width:11px;border-top:1px dashed var(--line)}
+.node{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.node .t{font-weight:500;min-width:0;overflow-wrap:anywhere}
+.node.proj>.t{font-weight:700;font-size:14.5px}
+.tag{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.hrs{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--idle-soft);width:120px;flex:none}
+.bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:12px;white-space:nowrap}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+a{color:var(--accent)}
+a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
+.gl{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.g{border:1px solid var(--line);border-radius:8px;padding:10px 12px;scroll-margin-top:16px}
+.g:target,.g.flash{outline:2px solid var(--accent);background:var(--accent-soft)}
+.g b{display:block}
+.g p{margin:4px 0 0;font-size:13px}
+.log{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.log div{display:flex;gap:10px}
+.log time{font-family:var(--mono);font-size:11.5px;color:var(--muted);flex:none;width:86px}
+.note{font-size:12px;color:var(--muted)}
+.status{font-size:12px;color:var(--warn)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="title">PM 총괄판</h1>
+      <div class="sub" id="updated">불러오는 중…</div>
+    </div>
+    <div class="status" id="netnote" hidden></div>
+  </header>
+
+  <section aria-labelledby="h-asks">
+    <h2 id="h-asks">대표님이 정하실 것 · 하실 것 <span class="n" id="n-asks"></span></h2>
+    <div class="asks" id="asks"><div class="empty">PM 이 정할 것을 올리면 여기에 보입니다. 지금은 없습니다.</div></div>
+  </section>
+
+  <div class="tiles" id="tiles">
+    <div class="tile"><b>–</b><span>일하는 하위 세션</span></div>
+    <div class="tile"><b>–</b><span>정하실 것</span></div>
+    <div class="tile"><b>–</b><span>남은 예상 시간</span></div>
+    <div class="tile"><b>–</b><span>끝난 할 일</span></div>
+  </div>
+
+  <div class="grid2">
+    <section aria-labelledby="h-tree">
+      <h2 id="h-tree">업무 나무 <span class="n">프로젝트 → 업무 → 세부</span></h2>
+      <div class="legend" id="legend"></div>
+      <ul class="tree" id="tree"><li class="empty">프로젝트와 업무가 올라오면 위아래 관계를 그림으로 보여 줍니다.</li></ul>
+    </section>
+    <section aria-labelledby="h-sess">
+      <h2 id="h-sess">하위 세션 <span class="n" id="n-sess"></span></h2>
+      <div class="tbl"><table><thead><tr><th>세션</th><th>상태</th><th>맡은 일</th><th>모델 · 노력</th><th>PR · 결과</th></tr></thead><tbody id="sess"><tr><td colspan="5" class="empty">하위 세션을 만들면 여기에 줄이 생깁니다.</td></tr></tbody></table></div>
+      <p class="note">끝난 세션은 PR 머지 · 남은 질문 없음 · 결과 확인이 모두 되면 저절로 「보관」됩니다. 보관은 되돌릴 수 있습니다.</p>
+    </section>
+  </div>
+
+  <section aria-labelledby="h-todo">
+    <h2 id="h-todo">할 일과 예상 시간 <span class="n" id="n-todo"></span></h2>
+    <div class="tbl"><table><thead><tr><th>할 일</th><th>프로젝트</th><th>상태</th><th>담당</th><th>모델 · 노력</th><th>예상</th><th>실제</th><th>근거</th></tr></thead><tbody id="todo"><tr><td colspan="8" class="empty">할 일이 올라오면 예상 시간과 실제 걸린 시간을 함께 보여 줍니다.</td></tr></tbody></table></div>
+    <p class="note">예상은 비슷한 일의 실제 시간을 보고 PM 이 고칩니다. 시간 단위는 시간(h)입니다. 모델 · 노력은 진행 방식(가성비 · 결과우선)과 일 종류(A 단순 ~ E 설계·검수)로 정하며, 표보다 높게 쓰지 않습니다.</p>
+  </section>
+
+  <div class="grid2">
+    <section aria-labelledby="h-gl">
+      <h2 id="h-gl">용어집 <span class="n" id="n-gl"></span></h2>
+      <div class="gl" id="gl"><div class="empty">보고에 나온 용어를 여기서 풀어 드립니다.</div></div>
+    </section>
+    <section aria-labelledby="h-log">
+      <h2 id="h-log">최근 기록</h2>
+      <div class="log" id="log"><div class="empty">결정 · 머지 · 보관 같은 일이 생기면 시간순으로 남깁니다.</div></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const ST=["진행","검증","대표","막힘","대기","보류","완료","보관"];
+  const COLOR={"진행":"var(--accent)","검증":"var(--accent)","대표":"var(--warn)","막힘":"var(--bad)","대기":"var(--idle)","보류":"var(--idle)","완료":"var(--ok)","보관":"var(--idle)"};
+  const S={meta:null,projects:[],tasks:[],asks:[],sessions:[],glossary:[],log:[]};
+  let gotFresh=false;
+
+  function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+  // {{slug}} 또는 {{slug|보이는 글}} → 용어집 링크
+  function rich(s){
+    return esc(s).replace(/\{\{([A-Za-z0-9-]+)(?:\|([^}]*))?\}\}/g,(m,slug,label)=>{
+      const g=S.glossary.find(x=>x.id===slug);
+      const text=label||(g&&g.term)||slug;
+      return '<a class="term" href="#g-'+slug+'" title="'+esc(g?g.short:"")+'">'+text+'</a>';
+    });
+  }
+  function chip(st){st=st||"대기";return '<span class="chip s-'+esc(st)+'">'+esc(st)+'</span>'}
+  function h(n){return (n==null||n==="")?"–":(Math.round(Number(n)*10)/10)+"h"}
+  function link(u,t){return /^https:\/\//.test(u||"")?'<a href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(t||u)+'</a>':esc(t||u||"")}
+  const KIND={A:"단순",B:"조사·문서",C:"일반 개발",D:"위험 개발",E:"설계·검수"};
+  function me(x){if(!x.model&&!x.effort)return '<span class="note">–</span>';return '<span class="tag">'+esc([x.model,x.effort].filter(Boolean).join(" · "))+'</span>'+(x.kind?'<div class="note">'+esc(x.kind)+' '+esc(KIND[x.kind]||"")+'</div>':'')}
+  const ord=a=>a.slice().sort((x,y)=>(x.order??999)-(y.order??999)||String(x.id).localeCompare(String(y.id)));
+
+  function renderAsks(){
+    const open=ord(S.asks.filter(a=>a.status!=="답함"&&a.status!=="끝"));
+    $("n-asks").textContent=open.length?open.length+"건":"";
+    if(!open.length){$("asks").innerHTML='<div class="empty">지금 정하실 것은 없습니다.</div>';return}
+    $("asks").innerHTML=open.map(a=>'<div class="ask"><div class="q">'+rich(a.question)+'</div>'+
+      (a.recommend?'<div class="rec">추천: '+rich(a.recommend)+'</div>':'')+
+      '<div class="meta">'+[a.kind,a.from?("보낸 곳: "+esc(a.from)):"",a.created?esc(a.created):""].filter(Boolean).join(" · ")+
+      (a.why?'<br>'+rich(a.why):'')+'</div></div>').join("");
+  }
+  function renderTiles(){
+    const working=S.sessions.filter(s=>s.status==="진행"||s.status==="검증").length;
+    const asks=S.asks.filter(a=>a.status!=="답함"&&a.status!=="끝").length;
+    const remain=S.tasks.filter(t=>t.status!=="완료"&&t.status!=="보관").reduce((n,t)=>n+Math.max(0,(Number(t.est_h)||0)-(Number(t.spent_h)||0)),0);
+    const done=S.tasks.filter(t=>t.status==="완료").length;
+    const tiles=[[working,"일하는 하위 세션"],[asks,"정하실 것",asks>0],[h(remain),"남은 예상 시간"],[done+" / "+S.tasks.length,"끝난 할 일"]];
+    $("tiles").innerHTML=tiles.map(([v,l,hot])=>'<div class="tile'+(hot?' hot':'')+'"><b>'+esc(v)+'</b><span>'+l+'</span></div>').join("");
+  }
+  function barFor(list){
+    const tot=list.length||1;
+    return '<span class="bar" aria-hidden="true">'+ST.map(st=>{const n=list.filter(t=>(t.status||"대기")===st).length;return n?'<i style="width:'+(n/tot*100)+'%;background:'+COLOR[st]+'"></i>':''}).join("")+'</span>';
+  }
+  function renderTree(){
+    $("legend").innerHTML=["진행","대표","막힘","대기","완료"].map(chip).join("");
+    const projs=ord(S.projects);
+    if(!projs.length){$("tree").innerHTML='<li class="empty">프로젝트와 업무가 올라오면 위아래 관계를 그림으로 보여 줍니다.</li>';return}
+    const kids=pid=>ord(S.tasks.filter(t=>(t.parent||null)===pid));
+    const under=(pid)=>{const out=[];const walk=id=>kids(id).forEach(k=>{out.push(k);walk(k.id)});walk(pid);return out};
+    const nodeT=t=>{
+      const ch=kids(t.id);
+      return '<li><div class="node">'+chip(t.status)+'<span class="t">'+rich(t.title)+'</span>'+
+        (t.session?'<span class="tag">'+esc(t.session)+'</span>':'')+
+        '<span class="hrs">'+h(t.est_h)+(t.spent_h?(" / 실제 "+h(t.spent_h)):"")+'</span></div>'+
+        (ch.length?'<ul>'+ch.map(nodeT).join("")+'</ul>':'')+'</li>';
+    };
+    $("tree").innerHTML=projs.map(p=>{
+      const top=ord(S.tasks.filter(t=>t.project===p.id&&!t.parent));
+      const all=S.tasks.filter(t=>t.project===p.id);
+      return '<li><div class="node proj">'+chip(p.status)+'<span class="t">'+rich(p.name)+'</span>'+barFor(all)+
+        '<span class="hrs">'+all.filter(t=>t.status==="완료").length+'/'+all.length+'</span></div>'+
+        (p.note?'<div class="note">'+rich(p.note)+'</div>':'')+
+        (top.length?'<ul>'+top.map(nodeT).join("")+'</ul>':'')+'</li>';
+    }).join("");
+  }
+  function renderSessions(){
+    const rows=ord(S.sessions).sort((a,b)=>(a.status==="보관")-(b.status==="보관"));
+    $("n-sess").textContent=rows.length?rows.filter(r=>r.status!=="보관").length+"개 활성":"";
+    if(!rows.length)return;
+    $("sess").innerHTML=rows.map(s=>'<tr><td>'+esc(s.name)+'</td><td>'+chip(s.status)+'</td><td>'+rich(s.task)+'</td><td>'+me(s)+'</td><td>'+(s.pr?link(s.pr_url,s.pr):"")+(s.result?'<div class="note">'+rich(s.result)+'</div>':"")+'</td></tr>').join("");
+  }
+  function renderTodo(){
+    const rows=ord(S.tasks).sort((a,b)=>(a.status==="완료")-(b.status==="완료"));
+    const pn=id=>(S.projects.find(p=>p.id===id)||{}).name||"";
+    $("n-todo").textContent=rows.length?rows.length+"건":"";
+    if(!rows.length)return;
+    $("todo").innerHTML=rows.map(t=>'<tr><td>'+rich(t.title)+'</td><td>'+esc(pn(t.project))+'</td><td>'+chip(t.status)+'</td><td>'+esc(t.session||"")+'</td><td>'+me(t)+'</td><td class="num">'+h(t.est_h)+'</td><td class="num">'+h(t.spent_h)+'</td><td>'+(t.evidence?rich(t.evidence):(t.pr?link(t.pr_url,t.pr):""))+'</td></tr>').join("");
+  }
+  function renderGlossary(){
+    const rows=S.glossary.slice().sort((a,b)=>String(a.term).localeCompare(String(b.term),"ko"));
+    $("n-gl").textContent=rows.length?rows.length+"개":"";
+    if(!rows.length)return;
+    $("gl").innerHTML=rows.map(g=>'<div class="g" id="g-'+esc(g.id)+'"><b>'+esc(g.term)+'</b><p>'+rich(g.short)+'</p>'+(g.long?'<p class="note">'+rich(g.long)+'</p>':'')+(g.link?'<p>'+link(g.link,"더 보기")+'</p>':'')+'</div>').join("");
+    focusHash();
+  }
+  function renderLog(){
+    const rows=S.log.slice().sort((a,b)=>String(b.at).localeCompare(String(a.at))).slice(0,30);
+    if(!rows.length)return;
+    $("log").innerHTML=rows.map(l=>'<div><time>'+esc(l.at)+'</time><span>'+rich(l.text)+'</span></div>').join("");
+  }
+  function renderMeta(){
+    const m=S.meta||{};
+    if(m.title){$("title").textContent=m.title}
+    $("updated").innerHTML=(m.mode?'<span class="chip s-진행">진행 방식: '+esc(m.mode)+'</span> ':'')+(m.updated?("마지막 갱신 "+esc(m.updated)+(m.summary?" · "+rich(m.summary):"")):"아직 PM 이 데이터를 올리지 않았습니다.");
+  }
+  function renderAll(){renderMeta();renderAsks();renderTiles();renderTree();renderSessions();renderTodo();renderGlossary();renderLog()}
+  function focusHash(){
+    const m=/^#g-([A-Za-z0-9-]+)$/.exec(location.hash);if(!m)return;
+    const el=document.getElementById("g-"+m[1]);if(!el)return;
+    el.classList.add("flash");el.scrollIntoView({block:"center"});setTimeout(()=>el.classList.remove("flash"),1800);
+  }
+  window.addEventListener("hashchange",focusHash);
+  renderAll();
+
+  (async()=>{
+    const db=await (window.claude&&window.claude.use?window.claude.use("db"):null);
+    if(!db){$("updated").textContent="이 보기에서는 데이터를 읽을 수 없습니다. 로그인한 상태로 Claude 에서 열어 주세요.";return}
+    const timer=setTimeout(()=>{if(!gotFresh){const n=$("netnote");n.hidden=false;n.textContent="데이터를 아직 받지 못했습니다. 보이는 내용이 오래됐을 수 있습니다."}},10000);
+    const onErr=()=>{clearTimeout(timer);const n=$("netnote");n.hidden=false;n.textContent="데이터 연결이 끊겼습니다. 페이지를 다시 열어 주세요."};
+    const fresh=meta=>{if(!meta.fromCache){gotFresh=true;clearTimeout(timer);$("netnote").hidden=true}};
+    db.doc("meta/main").onSnapshot(s=>{S.meta=s.exists?s.data():null;fresh(s.metadata);renderAll()},onErr);
+    ["projects","tasks","asks","sessions","glossary","log"].forEach(c=>{
+      db.collection(c).onSnapshot(q=>{S[c]=q.docs.map(d=>Object.assign({id:d.id},d.data()));fresh(q.metadata);renderAll()},onErr);
+    });
+  })();
+})();
+</script>

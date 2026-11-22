@@ -1,0 +1,14 @@
+{
+  "name": "pm-hub",
+  "owner": {
+    "name": "AKO"
+  },
+  "plugins": [
+    {
+      "name": "pm-hub",
+      "source": "./plugins/pm-hub",
+      "description": "메인 PM 세션이 하위 세션에 일을 맡기고, 총괄판 · 질문창 · 예상 시간 · 용어집으로 대표가 한눈에 통제하게 하는 스킬"
+    }
+  ],
+  "description": "PM 총괄 스킬 배포용 마켓플레이스"
+}
