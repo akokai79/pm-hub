@@ -230,6 +230,24 @@ description: 메인(PM) 세션으로 일할 때 반드시 이 스킬을 쓴다. 
 - 과금이 생길 수 있는 작업(유료 API, 클라우드 빌드 · 함수 · DB 대량 사용, 반복 예약 작업)은 시작 전에 멈추고 묻는다: 무엇 때문에 · 무엇을 · 예상 사용량과 무료 한도 · 대안.
 - 큰 작업 묶음을 시작할 때는 구독 사용량(`get_usage` 가 있으면)을 보고 `meta.summary` 에 한 줄 적는다.
 
+## 10-1. 토큰 · 금액 (총괄판 맨 위)
+
+- 하위 세션 보고를 받을 때, 「오늘 요약」 때, 대표가 「사용량」이라고 할 때 이 스킬 폴더의 `usage.py` 로 다시 계산해 총괄판 `usage/main` 에 올린다.
+  ```
+  python -X utf8 usage.py --ids <PM 세션 id> <하위 세션 id ...> --krw <환율> --lean-cli <가벼운 CLI 시작 토큰> --out usage.json
+  ```
+  - 세션 id 는 세션 기록 파일 이름(`~/.claude/projects/<폴더>/<id>.jsonl`)이다. 하위 세션이 끝났다는 알림의 「Claude Code session is …」 값이 그것이다. 총괄판 `sessions` 에 `cli_id` 로 적어 둔다.
+  - 결과 JSON 에 `scope`(무엇을 셌는지) · `updated` 를 더해 `ArtifactData set usage/main` 에 `file_path` 로 올린다.
+- 금액은 Anthropic 공식 API 가격(1M 토큰당, 캐시 쓰기 5분 ×1.25 · 1시간 ×2)과 그날 환율로 계산한 **환산값**이다. 구독이면 실제 청구액이 아니라고 늘 같이 적는다. 가격표가 바뀌면 `usage.py` 의 `PRICES` 를 고친다.
+- 환율은 한 달에 한 번 정도만 찾아 고친다(검색 한 번). 날짜를 같이 적는다.
+- **CLI 절약 추정**: 처음 한 번 PM 세션과 같은 폴더에서 MCP 를 끈 가벼운 CLI 의 시작 토큰을 잰다(구독 사용량 아주 조금).
+  ```
+  claude -p "네" --output-format json --strict-mcp-config --mcp-config <빈 mcp json>
+  ```
+  - usage 의 `input + cache_read + cache_creation` 합을 `--lean-cli` 로 넣는다. 메모리 `pm-hub-mode` 에 적어 두고 다시 재지 않는다.
+  - 추정은 「요청마다 싣는 고정 부담이 그만큼 줄었다면」의 최대치다. 화면 · 세션 관리 · 아티팩트 같은 기능은 가벼운 CLI 에 없으므로, 실제로 옮길 수 있는 것은 단순 · 조사 · 일반 개발 같은 하위 작업뿐이라고 같이 적는다.
+  - 기본 `claude -p`(MCP 켬)는 오히려 앱보다 시작 토큰이 클 수 있다. 「CLI 로 하면 무조건 싸다」고 말하지 않는다.
+
 ## 11. 하루 요약
 
 - 그날 대표와의 첫 대화에서, 또는 「오늘 요약」을 받으면 짧게 정리한다:
@@ -243,9 +261,10 @@ description: 메인(PM) 세션으로 일할 때 반드시 이 스킬을 쓴다. 
 | 컬렉션 | 문서 id | 칸 |
 |---|---|---|
 | `meta` | `main` | `title` · `updated`("YYYY-MM-DD HH:MM") · `summary` · `mode`(가성비/결과우선) |
+| `usage` | `main` | `usage.py` 결과 그대로 + `scope` · `updated` (맨 위 사용량 칸) |
 | `projects` | 짧은 영문 id | `name` · `status` · `order` · `note` |
 | `tasks` | 짧은 영문 id | `project` · `parent`(상위 할 일 id, 없으면 생략) · `title` · `status` · `session` · `kind`(A~E) · `model` · `effort` · `est_h` · `spent_h` · `pr` · `pr_url` · `evidence` · `review`(대기/검수 중/통과/반려) · `reviewer`(검수 세션 이름) · `review_note` · `order` |
-| `sessions` | 세션 이름 | `name` · `status` · `task` · `kind`(A~E) · `model` · `effort` · `pr` · `pr_url` · `result` · `order` |
+| `sessions` | 세션 이름 | `name` · `status` · `task` · `cli_id`(세션 기록 id) · `kind`(A~E) · `model` · `effort` · `pr` · `pr_url` · `result` · `order` |
 | `asks` | `a1`, `a2` … | `status`(대기/답함) · `kind` · `question` · `recommend` · `why` · `from` · `created` · `answer` · `answered_at` · `order` |
 | `glossary` | slug | `term` · `short` · `long` · `link` |
 | `log` | `l1`, `l2` … | `at`("MM-DD HH:MM") · `text` |

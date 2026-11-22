@@ -96,6 +96,13 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
     <div class="status" id="netnote" hidden></div>
   </header>
 
+  <section aria-labelledby="h-use" id="usebox" hidden>
+    <h2 id="h-use">사용량 · 금액 <span class="n" id="n-use"></span></h2>
+    <div class="tiles" id="usetiles"></div>
+    <div class="tbl" style="margin-top:10px"><table><thead><tr><th>모델</th><th>노력</th><th>요청</th><th>토큰</th><th>금액(원)</th><th>달러</th></tr></thead><tbody id="useby"></tbody></table></div>
+    <p class="note" id="usenote"></p>
+  </section>
+
   <section aria-labelledby="h-asks">
     <h2 id="h-asks">대표님이 정하실 것 · 하실 것 <span class="n" id="n-asks"></span></h2>
     <div class="asks" id="asks"><div class="empty">PM 이 정할 것을 올리면 여기에 보입니다. 지금은 없습니다.</div></div>
@@ -144,7 +151,7 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
   const $=id=>document.getElementById(id);
   const ST=["진행","검수","대표","막힘","대기","보류","완료","보관"];
   const COLOR={"진행":"var(--accent)","검수":"var(--accent)","대표":"var(--warn)","막힘":"var(--bad)","대기":"var(--idle)","보류":"var(--idle)","완료":"var(--ok)","보관":"var(--idle)"};
-  const S={meta:null,projects:[],tasks:[],asks:[],sessions:[],glossary:[],log:[]};
+  const S={meta:null,usage:null,projects:[],tasks:[],asks:[],sessions:[],glossary:[],log:[]};
   let gotFresh=false;
 
   function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -237,7 +244,23 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
     if(m.title){$("title").textContent=m.title}
     $("updated").innerHTML=(m.mode?'<span class="chip s-진행">진행 방식: '+esc(m.mode)+'</span> ':'')+(m.updated?("마지막 갱신 "+esc(m.updated)+(m.summary?" · "+rich(m.summary):"")):"아직 PM 이 데이터를 올리지 않았습니다.");
   }
-  function renderAll(){renderMeta();renderAsks();renderTiles();renderTree();renderSessions();renderTodo();renderGlossary();renderLog()}
+  function kn(n){n=Number(n)||0;if(n>=1e8)return (Math.round(n/1e7)/10)+"억";if(n>=1e4)return Math.round(n/1e4).toLocaleString("ko-KR")+"만";return n.toLocaleString("ko-KR")}
+  function won(n){return (Number(n)||0).toLocaleString("ko-KR")+"원"}
+  function renderUsage(){
+    const u=S.usage;if(!u){$("usebox").hidden=true;return}
+    $("usebox").hidden=false;
+    $("n-use").textContent=(u.scope?u.scope+" · ":"")+(u.updated||"");
+    const c=u.cli||{};
+    $("usetiles").innerHTML=[
+      [kn(u.tokens)+" 토큰","쓴 토큰 합계 (요청 "+(u.requests||0).toLocaleString("ko-KR")+"번)"],
+      [won(u.krw),"API 가격으로 치면 ($"+(u.usd||0).toLocaleString("en-US")+")",true],
+      [kn(c.tokens)+" 토큰","CLI 로 했다면 줄었을 토큰 (추정)"],
+      [won(c.krw),"CLI 로 했다면 아꼈을 금액 (추정 · 약 "+(c.pct||0)+"%)"]
+    ].map(([v,l,hot])=>'<div class="tile'+(hot?' hot':'')+'"><b>'+esc(v)+'</b><span>'+esc(l)+'</span></div>').join("");
+    $("useby").innerHTML=(u.by||[]).filter(b=>b.usd>0).map(b=>'<tr><td>'+esc(b.model)+'</td><td>'+esc(b.effort)+'</td><td class="num">'+(b.requests||0).toLocaleString("ko-KR")+'</td><td class="num">'+kn(b.tokens)+'</td><td class="num">'+won(b.krw)+'</td><td class="num">$'+(b.usd||0).toLocaleString("en-US")+'</td></tr>').join("");
+    $("usenote").innerHTML=rich(u.note||("금액은 Anthropic 공식 API 가격(1M 토큰당)과 환율 "+(u.krw_rate||"")+"원/달러로 계산한 환산값입니다. 구독 요금제로 썼다면 실제 청구액이 아닙니다. CLI 추정은 요청마다 싣는 고정 부담(도구 설명 등)이 MCP 를 끈 가벼운 CLI 수준("+kn(c.lean_cli_prefix)+")으로 줄었다고 보고 계산한 최대치입니다."));
+  }
+  function renderAll(){renderUsage();renderMeta();renderAsks();renderTiles();renderTree();renderSessions();renderTodo();renderGlossary();renderLog()}
   function focusHash(){
     const m=/^#g-([A-Za-z0-9-]+)$/.exec(location.hash);if(!m)return;
     const el=document.getElementById("g-"+m[1]);if(!el)return;
@@ -253,6 +276,7 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
     const onErr=()=>{clearTimeout(timer);const n=$("netnote");n.hidden=false;n.textContent="데이터 연결이 끊겼습니다. 페이지를 다시 열어 주세요."};
     const fresh=meta=>{if(!meta.fromCache){gotFresh=true;clearTimeout(timer);$("netnote").hidden=true}};
     db.doc("meta/main").onSnapshot(s=>{S.meta=s.exists?s.data():null;fresh(s.metadata);renderAll()},onErr);
+    db.doc("usage/main").onSnapshot(s=>{S.usage=s.exists?s.data():null;renderAll()},onErr);
     ["projects","tasks","asks","sessions","glossary","log"].forEach(c=>{
       db.collection(c).onSnapshot(q=>{S[c]=q.docs.map(d=>Object.assign({id:d.id},d.data()));fresh(q.metadata);renderAll()},onErr);
     });
