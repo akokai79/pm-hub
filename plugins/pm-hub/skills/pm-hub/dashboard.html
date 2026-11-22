@@ -98,6 +98,18 @@ details{border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-t
 details summary{cursor:pointer;font-weight:500}
 details pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:12.5px;max-height:420px;overflow:auto;margin:8px 0 0}
 td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:200px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{font:inherit;font-size:13.5px;font-weight:500;min-height:40px;min-width:132px;padding:0 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--panel);cursor:pointer}
+.btn.ghost{background:var(--panel);color:var(--accent)}
+.btn:disabled{opacity:.55;cursor:wait}
+.btn.sm{min-width:0;min-height:30px;font-size:12px;padding:0 10px}
+.adv{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.adv h3{font-size:14px;margin:6px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.card .say{display:flex;gap:8px;align-items:flex-start;background:var(--accent-soft);border-radius:6px;padding:6px 8px;font-size:13px}
+.card .say span{flex:1;min-width:0;overflow-wrap:anywhere}
+.card ol{margin:2px 0 0;padding-left:20px}
+.r-낮음{background:var(--ok-soft);color:var(--ok)}.r-중간{background:var(--warn-soft);color:var(--warn)}.r-높음{background:var(--bad-soft);color:var(--bad)}
 </style>
 
 <div class="wrap">
@@ -169,7 +181,13 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
 
   <div id="tab-config" class="tabpane" hidden>
     <section><h2>설정 요약 <span class="n" id="cfg-when"></span></h2><div class="tiles" id="cfg-tiles"><div class="tile"><b>–</b><span>PM 이 설정을 모으면 보입니다</span></div></div>
-      <p class="note">비밀값(토큰 · 키 · 비밀번호)으로 보이는 것은 ••• 로 가렸고, 환경변수 · MCP 는 이름만 보입니다.</p></section>
+      <p class="note">비밀값(토큰 · 키 · 비밀번호)으로 보이는 것은 ••• 로 가렸고, 환경변수 · MCP 는 이름만 보입니다.</p>
+      <div class="btns" id="cfg-btns" hidden>
+        <button type="button" class="btn" id="b-del">삭제 추천</button>
+        <button type="button" class="btn" id="b-add">추가 추천</button>
+      </div>
+      <p class="note" id="cfg-ai-note" hidden>버튼을 누르면 이 화면의 설정 목록을 Claude 에게 보내 추천을 받습니다(내 Claude 사용량을 씁니다). 페이지는 아무것도 지우거나 바꾸지 않습니다. 하고 싶은 추천은 「PM 에게 보낼 말」을 복사해 메인 세션에 보내세요.</p>
+      <div id="adv-del"></div><div id="adv-add"></div></section>
     <section><h2>CLAUDE.md (지침)</h2><div id="cfg-md" class="empty">–</div></section>
     <div class="grid2">
       <section><h2>내 스킬 <span class="n" id="cfg-ns"></span></h2><div class="tbl"><table><thead><tr><th>이름</th><th>설명</th><th>어디</th></tr></thead><tbody id="cfg-skills"></tbody></table></div></section>
@@ -186,7 +204,10 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
 
   <div id="tab-ctl" class="tabpane" hidden>
     <section><h2 id="ctl-title">AI 통제 점검 <span class="n" id="ctl-when"></span></h2><div class="tiles" id="ctl-tiles"><div class="tile"><b>–</b><span>점검 결과가 올라오면 보입니다</span></div></div>
-      <p class="note" id="ctl-src"></p></section>
+      <p class="note" id="ctl-src"></p>
+      <div class="btns" id="ctl-btns" hidden><button type="button" class="btn" id="b-ctl">해결 솔루션 가이드</button></div>
+      <p class="note" id="ctl-ai-note" hidden>「없음」 · 「부분 충족」 항목마다 고치는 순서 · 걸리는 시간 · 바로 할 수 있는 것을 Claude 에게 받아 각 항목 아래에 붙입니다(내 Claude 사용량을 씁니다).</p>
+      <div id="adv-ctl"></div></section>
     <div id="ctl-areas"></div>
   </div>
 </div>
@@ -335,8 +356,51 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     const areas=c.areas||{};const order=[...new Set(it.map(i=>i.area))];
     $("ctl-areas").innerHTML=order.map(a=>{const L=it.filter(i=>i.area===a);
       return '<section><h2>'+esc(areas[a]||a)+' <span class="n">'+esc(a)+' · '+L.length+'개</span></h2><div class="tbl"><table><thead><tr><th>번호</th><th>점검 질문</th><th>상태</th><th>근거 · 메모</th><th>다음 점검</th></tr></thead><tbody>'+
-      L.map(i=>'<tr><td class="num">'+esc(i.code)+'</td><td>'+esc(i.q)+'<div class="note">'+esc(i.basis||"")+'</div></td><td>'+chip(i.status||"미점검").replace("s-부분 충족","s-부분충족")+'</td><td>'+esc(i.note||"")+(i.ev?'<div class="note">증빙 '+i.ev+'건</div>':'')+'</td><td class="num">'+esc(i.next||"")+'</td></tr>').join("")+'</tbody></table></div></section>'}).join("");
+      L.map(i=>'<tr><td class="num">'+esc(i.code)+'</td><td>'+esc(i.q)+'<div class="note">'+esc(i.basis||"")+'</div></td><td>'+chip(i.status||"미점검").replace("s-부분 충족","s-부분충족")+'</td><td>'+esc(i.note||"")+(i.ev?'<div class="note">증빙 '+i.ev+'건</div>':'')+(i.status!=="충족"?ctlGuide(String(i.code)):"")+'</td><td class="num">'+esc(i.next||"")+'</td></tr>').join("")+'</tbody></table></div></section>'}).join("");
   }
+  /* ---- AI 추천 (sample) ---- */
+  let SAMPLE=null,DB=null;const ADV={};
+  function sayBox(t){return t?'<div class="say"><span>PM 에게 보낼 말: '+esc(t)+'</span><button type="button" class="btn ghost sm" data-copy="'+esc(t)+'">복사</button></div>':''}
+  document.addEventListener("click",async e=>{const b=e.target.closest("[data-copy]");if(!b)return;
+    try{await navigator.clipboard.writeText(b.dataset.copy);b.textContent="복사됨"}catch(_){const r=document.createRange();r.selectNodeContents(b.previousElementSibling);const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent="선택됨"}
+    setTimeout(()=>{b.textContent="복사"},1500)});
+  function cfgDigest(){const c=S.config||{};const L=[];
+    L.push("## CLAUDE.md (앞부분)");(c.claudemd||[]).forEach(m=>L.push("["+m.where+"]\n"+String(m.text).slice(0,3500)));
+    L.push("## 내 스킬");(c.skills||[]).forEach(s=>L.push("- "+s.name+" ("+s.source+"): "+s.desc));
+    L.push("## 플러그인 (CLI 켜짐 여부 · 스킬 수)");(c.plugins||[]).forEach(p=>L.push("- "+p.id+" · "+(p.on?"켜짐":"꺼짐")+" · 스킬 "+p.skills));
+    L.push("## 훅");(c.hooks||[]).forEach(h=>L.push("- "+h.event+" ["+(h.matcher||"전부")+"] "+h.type+": "+String(h.command).slice(0,140)));
+    L.push("## 권한 규칙");(c.perms||[]).forEach(p=>L.push("- "+p.kind+": "+p.rule+" ("+p.where+")"));
+    L.push("## 메모리");(c.memory||[]).forEach(m=>L.push("- "+m.title+": "+m.hook));
+    L.push("## 그 밖");Object.entries(c.other||{}).forEach(([k,v])=>L.push("- "+k+": "+v));
+    L.push("- 예약 작업: "+((c.tasks||[]).join(", ")||"없음"));
+    return L.join("\n").slice(0,60000)}
+  const RULE="모든 글은 쉬운 한국어로, 짧은 문장으로 쓴다. 영어 약어는 처음 나올 때 풀어 쓴다. 비밀값이나 개인 정보는 쓰지 않는다.";
+  const PROMPTS={
+    del:()=>"아래는 한 사람의 Claude Code 설정 목록이다. 겹치거나, 안 쓰는 것 같거나, 서로 부딪치거나, 위험하거나, 오래된 것 중 지우거나 정리하면 좋은 것을 최대 8개 골라라. 확실하지 않으면 「확인 필요」라고 적어라. "+RULE+"\n\n답은 JSON 배열 하나만: [{\"target\":\"대상 이름\",\"kind\":\"스킬|플러그인|훅|권한|메모리|지침|기타\",\"why\":\"왜 지우면 좋은지 1~2문장\",\"risk\":\"낮음|중간|높음\",\"say\":\"메인 PM 세션에 보낼 한 문장 지시\"}]\n\n"+cfgDigest(),
+    add:()=>"아래는 한 사람의 Claude Code 설정 목록이다. 이 사람의 지침(CLAUDE.md)과 쓰는 방식을 보고, 더하면 일이 편해지거나 안전해질 설정(스킬 · 훅 · 권한 규칙 · 메모리 · 지침 문장 · 플러그인)을 최대 8개 추천하라. 이미 있는 것은 빼라. "+RULE+"\n\n답은 JSON 배열 하나만: [{\"title\":\"추가할 것\",\"kind\":\"스킬|플러그인|훅|권한|메모리|지침|기타\",\"why\":\"왜 필요한지 1~2문장\",\"benefit\":\"좋아지는 점 한 줄\",\"risk\":\"낮음|중간|높음\",\"say\":\"메인 PM 세션에 보낼 한 문장 지시\"}]\n\n"+cfgDigest(),
+    ctl:()=>{const it=((S.ctl||{}).items||[]).filter(i=>i.status!=="충족");return "아래는 한 조직의 AI 통제 점검 결과 중 「없음」 · 「부분 충족」 항목이다. 항목마다 충족으로 만드는 해결 가이드를 써라: 순서대로 할 일 3~5개, 걸리는 시간(시간 단위), 오늘 바로 할 수 있는 작은 첫 걸음. 규정 원문(ISO 등)을 베끼지 말고 이 조직 메모에 맞춰 구체적으로 써라. "+RULE+"\n\n답은 JSON 배열 하나만: [{\"code\":\"항목 번호\",\"summary\":\"한 줄 요약\",\"steps\":[\"할 일\"],\"hours\":숫자,\"first\":\"오늘 할 첫 걸음\",\"say\":\"메인 PM 세션에 보낼 한 문장 지시\"}]\n\n"+it.map(i=>"- "+i.code+" ["+i.status+"] "+i.q+" / 메모: "+(i.note||"")).join("\n")}
+  };
+  function renderAdvice(kind){const a=ADV[kind];const box=$("adv-"+kind);if(!box)return;
+    if(kind==="ctl"){renderCtl();if(!a){box.innerHTML="";return}box.innerHTML='<div class="adv"><h3>해결 솔루션 가이드 <span class="n">'+esc(a.at||"")+' · 각 항목 아래에 붙였습니다</span></h3></div>';return}
+    if(!a||!Array.isArray(a.items)){box.innerHTML="";return}
+    const title=kind==="del"?"삭제 추천":"추가 추천";
+    box.innerHTML='<div class="adv"><h3>'+title+' <span class="n">'+esc(a.at||"")+' · '+a.items.length+'개</span></h3>'+a.items.map(x=>'<div class="card"><div><span class="chip r-'+esc(x.risk||"중간")+'">위험 '+esc(x.risk||"?")+'</span> <b>'+esc(x.target||x.title||"")+'</b> <span class="tag">'+esc(x.kind||"")+'</span></div><div>'+esc(x.why||"")+'</div>'+(x.benefit?'<div class="note">'+esc(x.benefit)+'</div>':'')+sayBox(x.say)+'</div>').join("")+'</div>'}
+  async function runAdvice(kind,btn){
+    if(!SAMPLE)return;const box=$("adv-"+kind);const label=btn.textContent;btn.disabled=true;btn.textContent="생각하는 중…";
+    if(kind!=="ctl")box.innerHTML='<div class="adv"><div class="note">Claude 가 설정을 읽고 있습니다. 보통 30초~1분 걸립니다.</div></div>';
+    else box.innerHTML='<div class="adv"><div class="note">항목별 해결 가이드를 만드는 중입니다. 1~2분 걸릴 수 있습니다.</div></div>';
+    try{const out=await SAMPLE.json(PROMPTS[kind](),{cache:false});const items=Array.isArray(out)?out:[];
+      const doc={items,at:new Date().toLocaleString("ko-KR",{hour12:false}).slice(0,-3)};ADV[kind]=doc;renderAdvice(kind);
+      try{await DB.doc("advice/"+kind).set(doc)}catch(_){}}
+    catch(e){const m={not_granted:"Claude 사용을 허락하지 않아 추천을 받을 수 없습니다.",rate_limited:"사용 한도에 닿았습니다. 잠시 뒤 다시 눌러 주세요.",invalid_json:"답을 읽지 못했습니다. 한 번 더 눌러 주세요.",refused:"Claude 가 이 요청에 답하지 않았습니다."};
+      box.innerHTML='<div class="adv"><div class="note">'+esc(m[e&&e.code]||"추천을 받지 못했습니다. 잠시 뒤 다시 눌러 주세요.")+'</div></div>';
+      if(e&&(e.code==="not_granted"||e.code==="sampling_disabled")){["cfg-btns","ctl-btns","cfg-ai-note","ctl-ai-note"].forEach(id=>$(id).hidden=true)}}
+    finally{btn.disabled=false;btn.textContent=label}}
+  $("b-del").addEventListener("click",e=>runAdvice("del",e.currentTarget));
+  $("b-add").addEventListener("click",e=>runAdvice("add",e.currentTarget));
+  $("b-ctl").addEventListener("click",e=>runAdvice("ctl",e.currentTarget));
+  function ctlGuide(code){const a=ADV.ctl;if(!a||!Array.isArray(a.items))return "";const g=a.items.find(x=>String(x.code)===code);if(!g)return "";
+    return '<details><summary>해결 가이드 · 약 '+esc(g.hours??"?")+'시간</summary><div class="card"><div><b>'+esc(g.summary||"")+'</b></div><ol>'+(g.steps||[]).map(s=>'<li>'+esc(s)+'</li>').join("")+'</ol>'+(g.first?'<div class="note">오늘 할 첫 걸음: '+esc(g.first)+'</div>':'')+sayBox(g.say)+'</div></details>'}
   function showTab(){
     const h=(location.hash||"#board").slice(1);const t=["board","config","ctl"].includes(h)?h:(/^g-/.test(h)?"board":"board");
     ["board","config","ctl"].forEach(x=>{$("tab-"+x).hidden=x!==t;$("t-"+x).setAttribute("aria-selected",String(x===t))});
@@ -361,6 +425,10 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     db.doc("usage/main").onSnapshot(s=>{S.usage=s.exists?s.data():null;renderAll()},onErr);
     db.doc("config/main").onSnapshot(s=>{S.config=s.exists?s.data():null;renderAll()},onErr);
     db.doc("ctl/main").onSnapshot(s=>{S.ctl=s.exists?s.data():null;renderAll()},onErr);
+    DB=db;
+    ["del","add","ctl"].forEach(k=>db.doc("advice/"+k).onSnapshot(s=>{if(s.exists){ADV[k]=s.data();renderAdvice(k)}},()=>{}));
+    const sp=await (window.claude.use?window.claude.use("sample"):null);
+    if(sp){SAMPLE=sp;["cfg-btns","ctl-btns","cfg-ai-note","ctl-ai-note"].forEach(id=>$(id).hidden=false)}
     ["projects","tasks","asks","sessions","glossary","log"].forEach(c=>{
       db.collection(c).onSnapshot(q=>{S[c]=q.docs.map(d=>Object.assign({id:d.id},d.data()));fresh(q.metadata);renderAll()},onErr);
     });
