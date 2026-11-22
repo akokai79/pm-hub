@@ -5,7 +5,7 @@ Claude Code 의 메인 세션 하나가 PM 이 되어 대화 · 일 나누기 ·
 
 ## 설치 (한 줄)
 
-PowerShell 이나 터미널에 아래 한 줄을 붙여 넣고 실행합니다.
+PowerShell 이나 터미널에 아래 한 줄을 붙여 넣고 실행합니다. 또는 Claude 세션에 「이 명령 실행해서 설치해줘:」 뒤에 붙여 보내면 Claude 가 대신 실행합니다.
 
 ```
 claude plugin marketplace add akokai79/pm-hub; claude plugin install pm-hub@pm-hub
