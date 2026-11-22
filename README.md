@@ -16,6 +16,8 @@ claude plugin marketplace add akokai79/pm-hub; claude plugin install pm-hub@pm-h
 
 업데이트: `claude plugin update pm-hub@pm-hub`
 
+그림과 표로 된 가이드는 설치 뒤 메인 세션에 「가이드」라고 보내면 열어 줍니다. (원본: [guide.html](plugins/pm-hub/skills/pm-hub/guide.html))
+
 ## 필요한 것
 
 - Claude 데스크톱 앱의 Code 탭 (하위 세션 만들기 · 보관 · 세션 목록은 데스크톱 앱 기능입니다)
