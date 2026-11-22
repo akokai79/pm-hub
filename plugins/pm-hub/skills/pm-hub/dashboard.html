@@ -85,6 +85,19 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
 .note{font-size:12px;color:var(--muted)}
 .status{font-size:12px;color:var(--warn)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs a{padding:10px 14px;text-decoration:none;color:var(--muted);font-weight:500;border-bottom:3px solid transparent;white-space:nowrap}
+.tabs a[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+.tabpane{display:flex;flex-direction:column;gap:18px}
+.tabpane[hidden]{display:none!important}
+.s-충족{background:var(--ok-soft);color:var(--ok)}
+.s-부분충족{background:var(--warn-soft);color:var(--warn)}
+.s-없음{background:var(--bad-soft);color:var(--bad)}
+.s-미점검{background:var(--idle-soft);color:var(--idle)}
+details{border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-top:8px}
+details summary{cursor:pointer;font-weight:500}
+details pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:12.5px;max-height:420px;overflow:auto;margin:8px 0 0}
+td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:200px}
 </style>
 
 <div class="wrap">
@@ -95,6 +108,14 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
     </div>
     <div class="status" id="netnote" hidden></div>
   </header>
+
+  <nav class="tabs" role="tablist" aria-label="총괄판 보기">
+    <a href="#board" role="tab" id="t-board" aria-selected="true">현황판</a>
+    <a href="#config" role="tab" id="t-config" aria-selected="false">설정 한눈에</a>
+    <a href="#ctl" role="tab" id="t-ctl" aria-selected="false">AI 통제 점검</a>
+  </nav>
+
+  <div id="tab-board" class="tabpane">
 
   <section aria-labelledby="h-use" id="usebox" hidden>
     <h2 id="h-use">사용량 · 금액 <span class="n" id="n-use"></span></h2>
@@ -144,6 +165,30 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
       <div class="log" id="log"><div class="empty">결정 · 머지 · 보관 같은 일이 생기면 시간순으로 남깁니다.</div></div>
     </section>
   </div>
+  </div>
+
+  <div id="tab-config" class="tabpane" hidden>
+    <section><h2>설정 요약 <span class="n" id="cfg-when"></span></h2><div class="tiles" id="cfg-tiles"><div class="tile"><b>–</b><span>PM 이 설정을 모으면 보입니다</span></div></div>
+      <p class="note">비밀값(토큰 · 키 · 비밀번호)으로 보이는 것은 ••• 로 가렸고, 환경변수 · MCP 는 이름만 보입니다.</p></section>
+    <section><h2>CLAUDE.md (지침)</h2><div id="cfg-md" class="empty">–</div></section>
+    <div class="grid2">
+      <section><h2>내 스킬 <span class="n" id="cfg-ns"></span></h2><div class="tbl"><table><thead><tr><th>이름</th><th>설명</th><th>어디</th></tr></thead><tbody id="cfg-skills"></tbody></table></div></section>
+      <section><h2>플러그인 <span class="n" id="cfg-np"></span></h2><div class="tbl"><table><thead><tr><th>플러그인</th><th>CLI 켜짐</th><th>스킬</th></tr></thead><tbody id="cfg-plugins"></tbody></table></div>
+        <p class="note">데스크톱 앱은 claude.ai 에서 켠 플러그인을 따로 씁니다. 「CLI 켜짐」은 터미널 claude 기준입니다.</p></section>
+    </div>
+    <section><h2>훅 (자동 실행) <span class="n" id="cfg-nh"></span></h2><div class="tbl"><table><thead><tr><th>언제</th><th>대상</th><th>종류</th><th>실행</th><th>어디</th></tr></thead><tbody id="cfg-hooks"></tbody></table></div></section>
+    <div class="grid2">
+      <section><h2>권한 규칙 <span class="n" id="cfg-nperm"></span></h2><div class="tbl"><table><thead><tr><th>종류</th><th>규칙</th><th>어디</th></tr></thead><tbody id="cfg-perms"></tbody></table></div></section>
+      <section><h2>메모리 <span class="n" id="cfg-nmem"></span></h2><div class="tbl"><table><thead><tr><th>제목</th><th>요약</th></tr></thead><tbody id="cfg-mem"></tbody></table></div></section>
+    </div>
+    <section><h2>그 밖의 설정</h2><div class="tbl"><table><tbody id="cfg-other"></tbody></table></div></section>
+  </div>
+
+  <div id="tab-ctl" class="tabpane" hidden>
+    <section><h2 id="ctl-title">AI 통제 점검 <span class="n" id="ctl-when"></span></h2><div class="tiles" id="ctl-tiles"><div class="tile"><b>–</b><span>점검 결과가 올라오면 보입니다</span></div></div>
+      <p class="note" id="ctl-src"></p></section>
+    <div id="ctl-areas"></div>
+  </div>
 </div>
 
 <script>
@@ -151,7 +196,7 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
   const $=id=>document.getElementById(id);
   const ST=["진행","검수","대표","막힘","대기","보류","완료","보관"];
   const COLOR={"진행":"var(--accent)","검수":"var(--accent)","대표":"var(--warn)","막힘":"var(--bad)","대기":"var(--idle)","보류":"var(--idle)","완료":"var(--ok)","보관":"var(--idle)"};
-  const S={meta:null,usage:null,projects:[],tasks:[],asks:[],sessions:[],glossary:[],log:[]};
+  const S={meta:null,usage:null,config:null,ctl:null,projects:[],tasks:[],asks:[],sessions:[],glossary:[],log:[]};
   let gotFresh=false;
 
   function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -203,7 +248,7 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
       return '<li><div class="node">'+chip(t.status)+'<span class="t">'+rich(t.title)+'</span>'+
         (t.session?'<span class="tag">'+esc(t.session)+'</span>':'')+
         '<span class="hrs">'+h(t.est_h)+(t.spent_h?(" / 실제 "+h(t.spent_h)):"")+'</span></div>'+
-        (ch.length?'<ul>'+ch.map(nodeT).join("")+'</ul>':'')+'</li>';
+        '<ul>'+ch.map(nodeT).join("")+(t.parent?'':'<li><div class="node">'+chip(t.review==="통과"?"완료":t.review==="반려"?"막힘":t.review?"검수":"대기")+'<span class="t">AI 검수</span>'+(t.reviewer?'<span class="tag">'+esc(t.reviewer)+'</span>':'')+'<span class="hrs">'+esc(t.review||"할 일이 끝나면")+'</span></div></li>')+'</ul></li>';
     };
     $("tree").innerHTML=projs.map(p=>{
       const top=ord(S.tasks.filter(t=>t.project===p.id&&!t.parent));
@@ -260,7 +305,44 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
     $("useby").innerHTML=(u.by||[]).filter(b=>b.usd>0).map(b=>'<tr><td>'+esc(b.model)+'</td><td>'+esc(b.effort)+'</td><td class="num">'+(b.requests||0).toLocaleString("ko-KR")+'</td><td class="num">'+kn(b.tokens)+'</td><td class="num">'+won(b.krw)+'</td><td class="num">$'+(b.usd||0).toLocaleString("en-US")+'</td></tr>').join("");
     $("usenote").innerHTML=rich(u.note||("금액은 Anthropic 공식 API 가격(1M 토큰당)과 환율 "+(u.krw_rate||"")+"원/달러로 계산한 환산값입니다. 구독 요금제로 썼다면 실제 청구액이 아닙니다. CLI 추정은 요청마다 싣는 고정 부담(도구 설명 등)이 MCP 를 끈 가벼운 CLI 수준("+kn(c.lean_cli_prefix)+")으로 줄었다고 보고 계산한 최대치입니다."));
   }
-  function renderAll(){renderUsage();renderMeta();renderAsks();renderTiles();renderTree();renderSessions();renderTodo();renderGlossary();renderLog()}
+  function tile(v,l,hot){return '<div class="tile'+(hot?' hot':'')+'"><b>'+esc(v)+'</b><span>'+esc(l)+'</span></div>'}
+  function rows(id,list,fn,empty){$(id).innerHTML=list&&list.length?list.map(fn).join(""):'<tr><td colspan="5" class="empty">'+(empty||"없음")+'</td></tr>'}
+  function renderConfig(){
+    const c=S.config;if(!c)return;const n=c.counts||{};
+    $("cfg-when").textContent=c.updated||"";
+    $("cfg-tiles").innerHTML=[[n.claudemd,"CLAUDE.md"],[n.skills,"내 스킬"],[n.plugins+" (스킬 "+n.plugin_skills+")","플러그인"],[n.hooks,"훅"],[n.perms,"권한 규칙"],[n.mcp,"MCP 서버"],[n.memory,"메모리"],[n.tasks,"예약 작업"]].map(x=>tile(x[0],x[1])).join("");
+    $("cfg-md").innerHTML=(c.claudemd||[]).map(m=>'<details><summary>'+esc(m.where)+'</summary><pre>'+esc(m.text)+'</pre></details>').join("")||'<div class="empty">없음</div>';
+    $("cfg-ns").textContent=(c.skills||[]).length+"개";
+    rows("cfg-skills",c.skills,s=>'<tr><td>'+esc(s.name)+'</td><td>'+esc(s.desc)+'</td><td>'+esc(s.source)+'</td></tr>');
+    $("cfg-np").textContent=(c.plugins||[]).length+"개";
+    rows("cfg-plugins",c.plugins,p=>'<tr><td>'+esc(p.id)+'</td><td>'+(p.on?"켜짐":"꺼짐")+'</td><td>'+(p.skills?'<details><summary>'+p.skills+'개</summary><div class="note">'+esc((p.skill_names||[]).join(", "))+'</div></details>':"0")+'</td></tr>');
+    $("cfg-nh").textContent=(c.hooks||[]).length+"개";
+    rows("cfg-hooks",c.hooks,x=>'<tr><td>'+esc(x.event)+'</td><td>'+esc(x.matcher||"전부")+'</td><td>'+esc(x.type)+'</td><td class="cmd">'+esc(x.command)+'</td><td>'+esc(x.where)+'</td></tr>');
+    $("cfg-nperm").textContent=(c.perms||[]).length+"개";
+    rows("cfg-perms",c.perms,x=>'<tr><td>'+esc(x.kind)+'</td><td class="cmd">'+esc(x.rule)+'</td><td>'+esc(x.where)+'</td></tr>');
+    $("cfg-nmem").textContent=(c.memory||[]).length+"개";
+    rows("cfg-mem",c.memory,x=>'<tr><td>'+esc(x.title)+'</td><td>'+esc(x.hook)+'</td></tr>');
+    const o=Object.assign({},c.other||{});o["예약 작업"]=(c.tasks||[]).join(", ")||"없음";o["MCP 서버"]=(c.mcp||[]).map(m=>m.name+" ("+m.where+")").join(", ")||"없음 (claude.ai 커넥터는 따로)";o["에이전트"]=(c.agents||[]).join(", ")||"없음";
+    $("cfg-other").innerHTML=Object.entries(o).map(([k,v])=>'<tr><th>'+esc(k)+'</th><td class="cmd">'+esc(v===""?"없음":v)+'</td></tr>').join("");
+  }
+  function renderCtl(){
+    const c=S.ctl;if(!c)return;const it=c.items||[];
+    $("ctl-title").firstChild.textContent=(c.title||"AI 통제 점검")+" ";
+    $("ctl-when").textContent=c.updated||"";
+    const cnt=st=>it.filter(i=>(i.status||"미점검")===st).length;
+    $("ctl-tiles").innerHTML=[tile(it.length,"점검 항목"),tile(cnt("충족"),"충족"),tile(cnt("부분 충족"),"부분 충족"),tile(cnt("없음"),"없음 (빈칸)",cnt("없음")>0)].join("");
+    $("ctl-src").innerHTML="출처: "+esc(c.source||"")+(c.link?' · <a href="'+esc(c.link)+'" target="_blank" rel="noopener">원래 화면 열기</a>':"");
+    const areas=c.areas||{};const order=[...new Set(it.map(i=>i.area))];
+    $("ctl-areas").innerHTML=order.map(a=>{const L=it.filter(i=>i.area===a);
+      return '<section><h2>'+esc(areas[a]||a)+' <span class="n">'+esc(a)+' · '+L.length+'개</span></h2><div class="tbl"><table><thead><tr><th>번호</th><th>점검 질문</th><th>상태</th><th>근거 · 메모</th><th>다음 점검</th></tr></thead><tbody>'+
+      L.map(i=>'<tr><td class="num">'+esc(i.code)+'</td><td>'+esc(i.q)+'<div class="note">'+esc(i.basis||"")+'</div></td><td>'+chip(i.status||"미점검").replace("s-부분 충족","s-부분충족")+'</td><td>'+esc(i.note||"")+(i.ev?'<div class="note">증빙 '+i.ev+'건</div>':'')+'</td><td class="num">'+esc(i.next||"")+'</td></tr>').join("")+'</tbody></table></div></section>'}).join("");
+  }
+  function showTab(){
+    const h=(location.hash||"#board").slice(1);const t=["board","config","ctl"].includes(h)?h:(/^g-/.test(h)?"board":"board");
+    ["board","config","ctl"].forEach(x=>{$("tab-"+x).hidden=x!==t;$("t-"+x).setAttribute("aria-selected",String(x===t))});
+  }
+  window.addEventListener("hashchange",showTab);
+  function renderAll(){renderUsage();renderConfig();renderCtl();showTab();renderMeta();renderAsks();renderTiles();renderTree();renderSessions();renderTodo();renderGlossary();renderLog()}
   function focusHash(){
     const m=/^#g-([A-Za-z0-9-]+)$/.exec(location.hash);if(!m)return;
     const el=document.getElementById("g-"+m[1]);if(!el)return;
@@ -277,6 +359,8 @@ a.term{text-decoration:none;border-bottom:1px dotted var(--accent)}
     const fresh=meta=>{if(!meta.fromCache){gotFresh=true;clearTimeout(timer);$("netnote").hidden=true}};
     db.doc("meta/main").onSnapshot(s=>{S.meta=s.exists?s.data():null;fresh(s.metadata);renderAll()},onErr);
     db.doc("usage/main").onSnapshot(s=>{S.usage=s.exists?s.data():null;renderAll()},onErr);
+    db.doc("config/main").onSnapshot(s=>{S.config=s.exists?s.data():null;renderAll()},onErr);
+    db.doc("ctl/main").onSnapshot(s=>{S.ctl=s.exists?s.data():null;renderAll()},onErr);
     ["projects","tasks","asks","sessions","glossary","log"].forEach(c=>{
       db.collection(c).onSnapshot(q=>{S[c]=q.docs.map(d=>Object.assign({id:d.id},d.data()));fresh(q.metadata);renderAll()},onErr);
     });
