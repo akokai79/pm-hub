@@ -126,6 +126,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
       <div id="vermsg" class="adv" hidden></div>
     </div>
     <div class="status" id="netnote" hidden></div>
+    <button type="button" class="btn ghost sm" id="b-reload" title="화면을 다시 불러옵니다">↻ 새로고침</button>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="총괄판 보기">
@@ -383,6 +384,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
   }
   /* ---- AI 추천 (sample) ---- */
   let SAMPLE=null,DB=null;const ADV={};
+  document.addEventListener("click",e=>{const r=e.target.closest("#b-reload");if(!r)return;r.disabled=true;r.textContent="불러오는 중…";try{location.reload()}catch(_){r.disabled=false;r.textContent="↻ 새로고침 (실패 · 브라우저 새로고침을 쓰세요)"}});
   const INBOX={};
   function inboxOf(ref){let r=null;Object.keys(INBOX).forEach(k=>{const m=INBOX[k];if(m&&m.ref===ref&&(!r||String(m.at||"")>=String(r.at||"")))r=m});return r}
   function sayBox(t,ref){if(!t)return"";const m=ref?inboxOf(ref):null;
@@ -534,7 +536,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
      meta/main 의 latest_version · latest_checked 에 적어 둔다. 화면은 먼저 직접 읽어 보고(되면 바로), 안 되면 그 값을 쓴다.
      업데이트: 직접 받아 스스로 다시 올려 보고(artifact 권한), 안 되면 PM 에게 요청(inbox)을 보낸다 — PM 이 다음 턴에 올린다.
      스킬(플러그인) 파일은 이 페이지가 바꿀 수 없다 — claude plugin update pm-hub@pm-hub 를 따로 한다. */
-  const PMHUB_VERSION="1.10.1";
+  const PMHUB_VERSION="1.10.2";
   const RAW="https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/";
   const SKEL_HEAD='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
   let LATEST="",vdone=false,armed=false,updating=false,asked=false;
