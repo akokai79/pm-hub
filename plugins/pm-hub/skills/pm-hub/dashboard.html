@@ -126,6 +126,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
       <div id="vermsg" class="adv" hidden></div>
     </div>
     <div class="status" id="netnote" hidden></div>
+    <div class="status" id="inboxnote" hidden></div>
     <button type="button" class="btn ghost sm" id="b-reload" title="화면을 다시 불러옵니다">↻ 새로고침</button>
   </header>
 
@@ -386,6 +387,12 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
   let SAMPLE=null,DB=null;const ADV={};
   document.addEventListener("click",e=>{const r=e.target.closest("#b-reload");if(!r)return;r.disabled=true;r.textContent="불러오는 중…";try{location.reload()}catch(_){r.disabled=false;r.textContent="↻ 새로고침 (실패 · 브라우저 새로고침을 쓰세요)"}});
   const INBOX={};
+  /* PM 이 아직 안 읽은 요청(새로 · 대기) 건수 · 가장 오래된 것의 경과 시간을 맨 위에 보인다. 화면이 PM 을 깨우지 못하므로 쌓이는 것을 대표가 바로 알게 한다. */
+  function renderInboxNote(){const n=$("inboxnote");if(!n)return;const un=Object.keys(INBOX).map(k=>INBOX[k]).filter(m=>m&&(m.status==="새로"||m.status==="대기"));
+    if(!un.length){n.hidden=true;return}
+    let oldest=null;const now=new Date();un.forEach(m=>{const r=/^(\d\d)-(\d\d) (\d\d):(\d\d)$/.exec(String(m.at||""));if(r){const t=new Date(now.getFullYear(),+r[1]-1,+r[2],+r[3],+r[4]);if(!oldest||t<oldest)oldest=t}});
+    let age="";if(oldest){const h=(now-oldest)/3600000;age=" · 가장 오래된 것 "+(h<1?"1시간 안":h<48?Math.round(h)+"시간 전":Math.round(h/24)+"일 전")}
+    n.hidden=false;n.textContent="PM 이 아직 안 읽은 요청 "+un.length+"건"+age+" — PM 세션에 「우편함 확인」이라고 말하세요"}
   function inboxOf(ref){let r=null;Object.keys(INBOX).forEach(k=>{const m=INBOX[k];if(m&&m.ref===ref&&(!r||String(m.at||"")>=String(r.at||"")))r=m});return r}
   function sayBox(t,ref){if(!t)return"";const m=ref?inboxOf(ref):null;
     if(m&&m.status!=="처리")return '<div class="say"><span>PM 에게 보낼 말: '+esc(t)+'</span><button type="button" class="btn ghost sm" disabled>'+(m.status==="받음"?"PM 이 받음 ✓ (처리 중)":"보냄 ✓ (PM 이 다음 턴에 처리)")+'</button></div>';
@@ -395,7 +402,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     if(!DB){b.textContent="보낼 수 없음 (저장소 없음)";return}
     b.disabled=true;b.textContent="보내는 중…";
     const id="m"+Date.now().toString(36);const d=new Date(),p=n=>String(n).padStart(2,"0");
-    try{const doc={text:b.dataset.send,status:"새로",at:p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())};if(b.dataset.ref)doc.ref=b.dataset.ref;await DB.doc("inbox/"+id).set(doc);if(doc.ref){INBOX[id]=doc;["del","add"].forEach(k=>renderAdvice(k))}
+    try{const doc={text:b.dataset.send,status:"새로",at:p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())};if(b.dataset.ref)doc.ref=b.dataset.ref;await DB.doc("inbox/"+id).set(doc);INBOX[id]=doc;renderInboxNote();if(doc.ref)["del","add"].forEach(k=>renderAdvice(k));try{await navigator.clipboard.writeText(b.dataset.send)}catch(_){}
       b.textContent="보냄 ✓ (PM 이 다음 턴에 처리)"}
     catch(_){b.disabled=false;b.textContent="보내지 못함 · 다시 누르기"}});
   function cfgDigest(){const c=S.config||{};const L=[];
@@ -536,7 +543,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
      meta/main 의 latest_version · latest_checked 에 적어 둔다. 화면은 먼저 직접 읽어 보고(되면 바로), 안 되면 그 값을 쓴다.
      업데이트: 직접 받아 스스로 다시 올려 보고(artifact 권한), 안 되면 PM 에게 요청(inbox)을 보낸다 — PM 이 다음 턴에 올린다.
      스킬(플러그인) 파일은 이 페이지가 바꿀 수 없다 — claude plugin update pm-hub@pm-hub 를 따로 한다. */
-  const PMHUB_VERSION="1.10.2";
+  const PMHUB_VERSION="1.11.0";
   const RAW="https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/";
   const SKEL_HEAD='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
   let LATEST="",vdone=false,armed=false,updating=false,asked=false;
@@ -608,7 +615,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     db.doc("ctl/main").onSnapshot(s=>{S.ctl=s.exists?s.data():null;renderAll()},onErr);
     DB=db;
     db.doc("eval/main").onSnapshot(s=>{S.eval=s.exists?s.data():null;renderEval()},()=>{});
-    db.collection("inbox").onSnapshot(q=>{Object.keys(INBOX).forEach(k=>delete INBOX[k]);q.docs.forEach(d=>{INBOX[d.id]=d.data()});["del","add"].forEach(k=>renderAdvice(k))},()=>{});
+    db.collection("inbox").onSnapshot(q=>{Object.keys(INBOX).forEach(k=>delete INBOX[k]);q.docs.forEach(d=>{INBOX[d.id]=d.data()});renderInboxNote();["del","add"].forEach(k=>renderAdvice(k))},()=>{});
     ["del","add","ctl"].forEach(k=>db.doc("advice/"+k).onSnapshot(s=>{if(s.exists){ADV[k]=s.data();renderAdvice(k)}},()=>{}));
     let sp=null;try{sp=await window.claude.use("sample")}catch(_){sp=null}
     if(sp){SAMPLE=sp;$("b-eval").hidden=false;["cfg-btns","cfg-ai-note"].forEach(id=>$(id).hidden=false);renderCtl()}
