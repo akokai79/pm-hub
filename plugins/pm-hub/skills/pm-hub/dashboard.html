@@ -523,7 +523,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
   /* ---- 버전 확인 · 최신버전 업데이트 ----
      최신 번호는 공개 저장소(akokai79/pm-hub)의 plugin.json 에서 읽는다. 업데이트는 같은 저장소의 dashboard.html 을 받아 이 페이지를 스스로 다시 올린다(artifact 권한).
      스킬(플러그인) 파일은 이 페이지가 바꿀 수 없다 — claude plugin update pm-hub@pm-hub 를 따로 한다. */
-  const PMHUB_VERSION="1.9.0";
+  const PMHUB_VERSION="1.9.1";
   const RAW="https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/";
   const SKEL_HEAD='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
   let LATEST="",armed=false,updating=false;
@@ -549,7 +549,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     try{
       const r=await fetch(RAW+"skills/pm-hub/dashboard.html",{cache:"no-store"});if(!r.ok)throw {code:"fetch"};
       const html=await r.text();
-      if(!html.includes('const PMHUB_VERSION="'+LATEST+'"')||html.indexOf("</script>")<0||html.length<20000)throw {code:"bad"};
+      if(!html.includes('const PMHUB_VERSION="'+LATEST+'"')||html.indexOf("<\/script>")<0||html.length<20000)throw {code:"bad"};
       let art=null;try{art=await window.claude.use("artifact")}catch(_){art=null}
       if(!art){fallbackMsg("이 총괄판에는 스스로 업데이트하는 권한이 아직 없습니다(옛 버전으로 만들어졌습니다). 아래 말을 PM 세션에 보내 한 번만 올려 달라고 하세요. 그다음부터는 이 버튼으로 됩니다.");return}
       btn.textContent="올리는 중…";
