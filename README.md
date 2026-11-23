@@ -14,7 +14,7 @@ claude plugin marketplace add akokai79/pm-hub; claude plugin install pm-hub@pm-h
 그다음 Claude 데스크톱 앱을 껐다 켜고, **새 세션**에서 「PM 총괄로 시작해줘」라고 말하면 됩니다.
 처음 한 번은 본인 전용 총괄판(비공개 웹 페이지)을 만들고, 「가성비 / 결과우선」 중 진행 방식을 묻습니다.
 
-업데이트: `claude plugin update pm-hub@pm-hub` 를 하고 새 세션을 엽니다. 총괄판은 맨 위 「새 버전 있음 · 최신버전 업데이트」 단추를 두 번 누르면 스스로 최신으로 바뀝니다(1.9.0 이후 총괄판. 옛 총괄판은 PM 에게 「총괄판 업데이트」라고 한 번 말해 주세요).
+업데이트: `claude plugin update pm-hub@pm-hub` 를 하고 새 세션을 엽니다. 총괄판은 맨 위에 새 버전이 있으면 「최신버전 업데이트」 단추가 나옵니다(최신 번호는 PM 세션이 확인해 적습니다). 단추를 두 번 누르면 PM 에게 요청이 가고 PM 이 다음 턴에 총괄판을 최신으로 올립니다. 급하면 PM 에게 「총괄판 업데이트」라고 말하세요.
 
 그림과 표로 된 가이드는 설치 뒤 메인 세션에 「가이드」라고 보내면 열어 줍니다. (원본: [guide.html](plugins/pm-hub/skills/pm-hub/guide.html))
 

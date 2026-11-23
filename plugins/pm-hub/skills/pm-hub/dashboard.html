@@ -513,7 +513,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     ["board","config","ctl","eval"].forEach(x=>{$("tab-"+x).hidden=x!==t;$("t-"+x).setAttribute("aria-selected",String(x===t))});
   }
   window.addEventListener("hashchange",showTab);
-  function renderAll(){renderUsage();renderConfig();renderCtl();renderEval();showTab();renderMeta();renderAsks();renderTiles();renderTree();renderSessions();renderTodo();renderGlossary();renderLog()}
+  function renderAll(){showVer();renderUsage();renderConfig();renderCtl();renderEval();showTab();renderMeta();renderAsks();renderTiles();renderTree();renderSessions();renderTodo();renderGlossary();renderLog()}
   function focusHash(){
     const m=/^#g-([A-Za-z0-9-]+)$/.exec(location.hash);if(!m)return;
     const el=document.getElementById("g-"+m[1]);if(!el)return;
@@ -521,49 +521,54 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
   }
   window.addEventListener("hashchange",focusHash);
   /* ---- 버전 확인 · 최신버전 업데이트 ----
-     최신 번호는 공개 저장소(akokai79/pm-hub)의 plugin.json 에서 읽는다. 업데이트는 같은 저장소의 dashboard.html 을 받아 이 페이지를 스스로 다시 올린다(artifact 권한).
+     총괄판 화면(보안 샌드박스)은 외부 주소를 못 읽는 경우가 있다. 그래서 최신 번호는 PM 세션이 공개 저장소(akokai79/pm-hub)의 plugin.json 에서 읽어
+     meta/main 의 latest_version · latest_checked 에 적어 둔다. 화면은 먼저 직접 읽어 보고(되면 바로), 안 되면 그 값을 쓴다.
+     업데이트: 직접 받아 스스로 다시 올려 보고(artifact 권한), 안 되면 PM 에게 요청(inbox)을 보낸다 — PM 이 다음 턴에 올린다.
      스킬(플러그인) 파일은 이 페이지가 바꿀 수 없다 — claude plugin update pm-hub@pm-hub 를 따로 한다. */
-  const PMHUB_VERSION="1.9.1";
+  const PMHUB_VERSION="1.9.2";
   const RAW="https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/";
   const SKEL_HEAD='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
-  let LATEST="",armed=false,updating=false;
+  let LATEST="",vdone=false,armed=false,updating=false,asked=false;
   const vnew=(a,b)=>{const x=String(a).split(".").map(Number),y=String(b).split(".").map(Number);for(let i=0;i<3;i++){const d=(x[i]||0)-(y[i]||0);if(d)return d}return 0};
+  const okv=v=>/^\d+\.\d+\.\d+$/.test(String(v||""));
+  function latestNow(){const m=S.meta&&S.meta.latest_version;const best=[LATEST,m].filter(okv).sort((p,q)=>vnew(q,p))[0];return best||""}
   function showVer(){
-    const b=$("verbox");const cur="버전 "+PMHUB_VERSION;
-    if(!LATEST){b.innerHTML=esc(cur)+' · 최신 버전을 확인하지 못했습니다 <button type="button" class="btn ghost sm" id="b-vchk">다시 확인</button>';return}
-    if(vnew(LATEST,PMHUB_VERSION)>0)b.innerHTML=esc(cur)+' · <span class="chip s-대표">새 버전 '+esc(LATEST)+' 있음</span> <button type="button" class="btn sm" id="b-upd">최신버전 업데이트</button>';
-    else b.innerHTML=esc(cur)+' · <span class="chip s-완료">최신 버전입니다</span>';
+    if(!vdone)return;const b=$("verbox");const cur="버전 "+PMHUB_VERSION;const L=latestNow();
+    const when=(S.meta&&S.meta.latest_checked)?" (PM 확인 "+S.meta.latest_checked+")":"";
+    if(!L){b.innerHTML=esc(cur)+' · 최신 버전은 PM 이 확인해 알려 줍니다 <button type="button" class="btn ghost sm" id="b-vchk">다시 확인</button> <button type="button" class="btn ghost sm" id="b-vask">PM 에게 확인 요청</button>';return}
+    if(vnew(L,PMHUB_VERSION)>0)b.innerHTML=esc(cur)+' · <span class="chip s-대표">새 버전 '+esc(L)+' 있음</span> <button type="button" class="btn sm" id="b-upd">최신버전 업데이트</button>';
+    else b.innerHTML=esc(cur)+' · <span class="chip s-완료">최신 버전입니다</span><span class="note">'+esc(when)+'</span> <button type="button" class="btn ghost sm" id="b-vchk">다시 확인</button>';
   }
   async function checkVersion(){
-    $("verbox").textContent="버전 "+PMHUB_VERSION+" · 최신 버전 확인 중…";
-    try{const r=await fetch(RAW+".claude-plugin/plugin.json",{cache:"no-store"});if(!r.ok)throw 0;const j=await r.json();const v=String(j.version||"");if(!/^\d+\.\d+\.\d+$/.test(v))throw 0;LATEST=v}catch(_){LATEST=""}
-    showVer()}
+    vdone=false;$("verbox").textContent="버전 "+PMHUB_VERSION+" · 최신 버전 확인 중…";
+    try{const r=await fetch(RAW+".claude-plugin/plugin.json",{cache:"no-store"});if(!r.ok)throw 0;const j=await r.json();const v=String(j.version||"");if(!okv(v))throw 0;LATEST=v}catch(_){LATEST=""}
+    vdone=true;showVer()}
   function verMsg(html){const m=$("vermsg");m.hidden=!html;m.innerHTML=html||""}
-  function fallbackMsg(why){
-    const t="PM 총괄판 아티팩트를 최신 버전("+LATEST+")으로 올려줘. 스킬 폴더의 dashboard.html 을 같은 주소에 다시 올리고, capabilities 에 artifact 를 넣어 줘. 데이터는 그대로 두고.";
-    verMsg('<div class="card"><div>'+esc(why)+'</div>'+sayBox(t)+'<div class="say"><span>스킬(플러그인) 파일도 따로 올리려면 터미널에서: <code>claude plugin update pm-hub@pm-hub</code></span><button type="button" class="btn ghost sm" data-cp="claude plugin update pm-hub@pm-hub">복사</button></div></div>')}
+  async function askPM(text){
+    if(!DB){verMsg('<div class="note">요청을 보낼 수 없습니다(저장소 연결 없음). 아래 말을 PM 세션에 직접 보내세요: '+esc(text)+'</div>');return false}
+    const d=new Date(),p=n=>String(n).padStart(2,"0");
+    try{await DB.doc("inbox/up"+Date.now().toString(36)).set({text,status:"새로",at:p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())});return true}
+    catch(_){verMsg('<div class="note">요청을 보내지 못했습니다. 아래 말을 PM 세션에 직접 보내세요: '+esc(text)+'</div>');return false}}
+  function sentMsg(){verMsg('<div class="card"><div>PM 에게 요청을 보냈습니다. PM 세션이 다음 턴에 처리합니다(보통 바로 다음 대화). 급하면 PM 세션에 「총괄판 업데이트」라고 말하세요.</div><div class="say"><span>스킬(플러그인) 파일도 따로 올리려면 터미널에서: <code>claude plugin update pm-hub@pm-hub</code></span><button type="button" class="btn ghost sm" data-cp="claude plugin update pm-hub@pm-hub">복사</button></div></div>')}
   async function doUpdate(btn){
     if(updating)return;
     if(!armed){armed=true;btn.textContent="정말 업데이트 (한 번 더 누르기)";setTimeout(()=>{armed=false;if(btn.isConnected&&!updating)btn.textContent="최신버전 업데이트"},7000);return}
     updating=true;btn.disabled=true;btn.textContent="받는 중…";verMsg("");
+    const L=latestNow();let done=false;
     try{
-      const r=await fetch(RAW+"skills/pm-hub/dashboard.html",{cache:"no-store"});if(!r.ok)throw {code:"fetch"};
+      const r=await fetch(RAW+"skills/pm-hub/dashboard.html",{cache:"no-store"});if(!r.ok)throw 0;
       const html=await r.text();
-      if(!html.includes('const PMHUB_VERSION="'+LATEST+'"')||html.indexOf("<\/script>")<0||html.length<20000)throw {code:"bad"};
-      let art=null;try{art=await window.claude.use("artifact")}catch(_){art=null}
-      if(!art){fallbackMsg("이 총괄판에는 스스로 업데이트하는 권한이 아직 없습니다(옛 버전으로 만들어졌습니다). 아래 말을 PM 세션에 보내 한 번만 올려 달라고 하세요. 그다음부터는 이 버튼으로 됩니다.");return}
-      btn.textContent="올리는 중…";
-      await art.publish(SKEL_HEAD+html+"</body></html>");
+      if(!html.includes('const PMHUB_VERSION="'+L+'"')||html.indexOf("<\/script>")<0||html.length<20000)throw 0;
+      const art=await window.claude.use("artifact");if(!art)throw 0;
+      btn.textContent="올리는 중…";await art.publish(SKEL_HEAD+html+"</body></html>");done=true;
       verMsg('<div class="note">업데이트했습니다. 곧 새 화면으로 바뀝니다.</div>');
-    }catch(e){const c=e&&e.code;
-      if(c==="conflict")verMsg('<div class="note">다른 곳에서 먼저 바뀌었습니다. 새로고침한 뒤 다시 확인해 주세요.</div>');
-      else if(c==="not_granted"||c==="not_writer")fallbackMsg("이 화면에서는 고칠 권한이 없습니다(보기 전용). 아래 말을 PM 세션에 보내세요.");
-      else if(c==="bad")verMsg('<div class="note">받은 파일이 올바르지 않아 업데이트하지 않았습니다. 잠시 뒤(저장소 반영에 몇 분 걸릴 수 있음) 다시 눌러 주세요.</div>');
-      else fallbackMsg("저장소에서 파일을 받지 못했습니다(화면 보안 설정이 막았을 수 있습니다). 아래 말을 PM 세션에 보내 올려 달라고 하세요.")}
-    finally{updating=false;armed=false;if(btn.isConnected){btn.disabled=false;btn.textContent="최신버전 업데이트"}}}
+    }catch(_){
+      if(!done){btn.textContent="PM 에게 요청 보내는 중…";if(await askPM("PM 총괄판 아티팩트를 최신 버전("+L+")으로 업데이트해줘. 저장소(akokai79/pm-hub)의 최신 dashboard.html 을 받아 이 총괄판 주소에 다시 올리고, capabilities 에 db · sample · artifact 를 모두 넣어 줘. 데이터는 그대로 두고.")){sentMsg()}}
+    }finally{updating=false;armed=false;if(btn.isConnected){btn.disabled=false;btn.textContent="최신버전 업데이트"}}}
   document.addEventListener("click",async e=>{
     const u=e.target.closest("#b-upd");if(u){doUpdate(u);return}
-    if(e.target.closest("#b-vchk")){checkVersion();return}
+    if(e.target.closest("#b-vchk")){verMsg("");await checkVersion();const L=latestNow();verMsg('<div class="note">'+(L?"확인했습니다. 최신 번호는 "+esc(L)+" 입니다.":"이 화면에서는 저장소를 직접 읽을 수 없습니다. PM 세션이 확인해 적어 두면 여기에 나타납니다. 지금 알고 싶으면 「PM 에게 확인 요청」을 누르세요.")+'</div>');return}
+    const k=e.target.closest("#b-vask");if(k){k.disabled=true;if(await askPM("PM 총괄판의 최신 버전을 확인해 알려 주고, 새 버전이 있으면 총괄판을 업데이트해줘. (저장소 akokai79/pm-hub 의 plugin.json 번호를 meta/main latest_version 에 적어 줘)"))sentMsg();k.disabled=false;return}
     const c=e.target.closest("[data-cp]");if(!c)return;
     try{await navigator.clipboard.writeText(c.dataset.cp);c.textContent="복사됨"}catch(_){c.textContent="복사하지 못함"}
     setTimeout(()=>{c.textContent="복사"},1500)});

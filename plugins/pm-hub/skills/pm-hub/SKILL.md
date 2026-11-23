@@ -186,9 +186,13 @@ description: 메인(PM) 세션으로 일할 때 반드시 이 스킬을 쓴다. 
 
 ## 3-4-1. 「총괄판 업데이트」 (총괄판 · 스킬 최신 버전)
 
-- 총괄판 맨 위에 현재 버전과 「새 버전 있음 · 최신버전 업데이트」 단추가 있다(공개 저장소 `akokai79/pm-hub` 의 `plugin.json` 번호와 비교). 단추를 두 번 누르면 페이지가 최신 `dashboard.html` 을 받아 같은 주소에 스스로 다시 올린다. 데이터(ArtifactData)는 그대로다.
-- 옛 총괄판(1.9.0 이전)은 `artifact` 권한이 없어 단추가 못 한다 — 그때 총괄판이 「PM 에게 보내기」로 보낸 말(inbox)이나 대표의 「총괄판 업데이트」 한마디를 받으면 PM 이 이 스킬 폴더의 `dashboard.html` 을 총괄판 URL 로 다시 올린다(`url` 지정, `capabilities` 에 `db` · `sample` · `artifact` 모두 넣는다). 올리기 전에 `Artifact read` 로 현재 판을 읽는다.
-- 스킬(플러그인) 파일 자체는 페이지가 못 바꾼다 — 사용자가 터미널에서 `claude plugin update pm-hub@pm-hub` 를 한 뒤 새 세션을 연다. 대표가 물으면 이 명령을 코드 블록으로 알려 준다.
+- 총괄판 맨 위에 현재 버전과 「새 버전 있음 · 최신버전 업데이트」 단추가 있다. 총괄판 화면(보안 샌드박스)은 외부 주소를 못 읽을 수 있어서, **최신 번호는 PM 이 적는다**:
+  - 하루 첫 대화(또는 대표가 「총괄판 업데이트」 · 「버전」이라고 할 때)에 `curl -s https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/.claude-plugin/plugin.json` 의 `version` 을 읽어 `ArtifactData update meta/main` 으로 `latest_version` · `latest_checked`("MM-DD HH:MM")를 적는다(다른 칸은 건드리지 않는다). 읽지 못하면(오프라인) 적지 않는다.
+- 단추를 두 번 누르면 화면이 직접 받아 올려 보고, 안 되면 inbox 에 「총괄판을 최신 버전으로 업데이트해줘」 요청을 쌓는다. PM 이 그 요청(또는 대표의 「총괄판 업데이트」 한마디)을 받으면:
+  1. 저장소의 최신 `dashboard.html` 을 받아(`curl -s .../skills/pm-hub/dashboard.html -o <scratchpad>/pm-dashboard-latest.html`) 파일 안 `PMHUB_VERSION` 이 `latest_version` 과 같은지 확인한다(설치된 스킬 폴더 사본이 더 옛것일 수 있으니 저장소 사본을 쓴다).
+  2. 총괄판을 `Artifact read` 로 읽은 뒤, 그 파일을 총괄판 URL 로 올린다(`url` 지정, `capabilities` 에 `db` · `sample` · `artifact` 모두). 데이터(ArtifactData)는 그대로다.
+  3. inbox 를 「처리」로 바꾸고 대표께 한 줄로 알린다.
+- 스킬(플러그인) 파일 자체는 총괄판이 못 바꾼다 — 사용자가 터미널에서 `claude plugin marketplace update pm-hub; claude plugin update pm-hub@pm-hub` 를 한 뒤 새 세션을 연다. 대표가 물으면 이 명령을 코드 블록으로 알려 준다.
 
 ## 3-5. 「가이드」
 
