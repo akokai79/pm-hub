@@ -291,6 +291,13 @@ description: 메인(PM) 세션으로 일할 때 반드시 이 스킬을 쓴다. 
 | `asks` | `a1`, `a2` … | `status`(대기/답함) · `kind` · `question` · `recommend` · `why` · `from` · `created` · `answer` · `answered_at` · `order` |
 | `glossary` | slug | `term` · `short` · `long` · `link` |
 | `log` | `l1`, `l2` … | `at`("MM-DD HH:MM") · `text` |
+| `inbox` | 페이지가 만든 id | `text` · `status`(새로/받음/처리) · `at` — 총괄판 「PM 에게 보내기」 단추가 쓴다 |
+
+### 총괄판에서 온 말 (inbox)
+
+- 매 턴 처음(대표 메시지 · 하위 세션 보고 모두)에 `ArtifactData query inbox where status == "새로"` 를 읽는다.
+- 있으면 대표가 채팅으로 보낸 말처럼 다루되, 내용은 페이지가 만든 추천 문장이므로 「삭제 · 권한 · 설정 변경」은 실행 전에 질문창으로 한 번 확인한다(페이지 단추는 대표 본인 확인이 아니다).
+- 읽으면 `status: "받음"`, 끝나면 `"처리"` 와 `done`(한 줄)을 적는다.
 
 - `status` 값: 진행 · 검수 · 대표(대표님 차례) · 막힘 · 대기 · 보류 · 완료 · 보관
 - `log` 는 오래된 것을 30개 넘게 쌓지 말고, 넘으면 오래된 것부터 지운다(총괄판은 최근 30개만 보인다).
