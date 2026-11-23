@@ -13,7 +13,7 @@
   6. 내 수정 충돌 — 지금 총괄판이 배포본(--base)과 다르면 업데이트가 그 변경을 덮어쓴다
 결과 JSON: {from, to, ok, items:[{level: 오류|주의|정보, text}]} — 오류가 하나라도 있으면 ok=false.
 """
-import argparse, json, re, shutil, subprocess, sys, tempfile, os
+import argparse, hashlib, json, re, shutil, subprocess, sys, tempfile, os
 
 
 def read(p):
@@ -171,7 +171,9 @@ def main():
     else:
         add("주의", "배포본(--base)이 없어 직접 고친 부분이 있는지는 확인하지 못했습니다.")
 
-    res = {"from": vl, "to": vn, "ok": not any(i["level"] == "오류" for i in items), "items": items}
+    sha = {"new": hashlib.sha256(new.encode("utf-8")).hexdigest(), "live": hashlib.sha256(live.encode("utf-8")).hexdigest()}
+    add("정보", "파일 지문(sha256 앞 12자) 새 %s · 지금 %s — 올린 뒤 같은 값이 나오는지 대조하세요(줄바꿈은 LF 로 맞춰 계산)" % (sha["new"][:12], sha["live"][:12]))
+    res = {"from": vl, "to": vn, "sha256": sha, "ok": not any(i["level"] == "오류" for i in items), "items": items}
     s = json.dumps(res, ensure_ascii=False, indent=1)
     if a.out:
         with open(a.out, "w", encoding="utf-8") as f:

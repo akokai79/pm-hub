@@ -45,3 +45,10 @@ claude plugin marketplace add akokai79/pm-hub; claude plugin install pm-hub@pm-h
 - 완료 근거 확인, 멈춤 · 오류 알림, 비용 위험 먼저 묻기, 결정 기록, 하루 요약
 
 운영 배포 · 결제 · 영구 삭제 · 운영 DB 적용은 늘 먼저 묻도록 되어 있습니다.
+
+## 되돌리기 (총괄판 업데이트가 마음에 안 들 때)
+
+- **총괄판 화면**: claude.ai 에서 해당 아티팩트의 버전 목록(Version 번호)에서 이전 버전을 고르면 됩니다. 데이터(업무 · 설정 · 우편함)는 화면과 따로 저장돼 있어 그대로 남습니다.
+- **PM 에게 시키기**: 「총괄판을 이전 버전으로 되돌려줘」라고 말하면 PM 이 저장소의 이전 버전 `dashboard.html`(`git show <이전 커밋>:plugins/pm-hub/skills/pm-hub/dashboard.html`)을 같은 주소로 다시 올립니다.
+- **스킬(플러그인)**: `claude plugin install pm-hub@pm-hub` 로 특정 버전을 다시 받거나, 저장소의 이전 태그/커밋을 받아 쓰세요.
+- **올리기 전 확인**: `update-check.py` 결과의 `sha256` 값(새 파일 · 지금 파일)을 기록해 두면, 올린 뒤 파일이 같은지 대조할 수 있습니다.
