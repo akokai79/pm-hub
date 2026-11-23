@@ -109,6 +109,11 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
 .card .say{display:flex;gap:8px;align-items:flex-start;background:var(--accent-soft);border-radius:6px;padding:6px 8px;font-size:13px}
 .card .say span{flex:1;min-width:0;overflow-wrap:anywhere}
 .card ol{margin:2px 0 0;padding-left:20px}
+.sc-hi{color:var(--ok)}.sc-mid{color:var(--warn)}.sc-lo{color:var(--bad)}
+.tl{list-style:none;margin:6px 0 0;padding:0;font-size:13px;display:flex;flex-direction:column;gap:3px}
+.tl li{display:flex;gap:8px;align-items:flex-start}.tl .m{flex:none;width:1.4em;text-align:center;font-weight:700}
+.tl .ok{color:var(--ok)}.tl .ng{color:var(--bad)}.tl .sk{color:var(--idle)}
+.p-높음{background:var(--bad-soft);color:var(--bad)}.p-중간{background:var(--warn-soft);color:var(--warn)}.p-낮음{background:var(--idle-soft);color:var(--idle)}
 .r-낮음{background:var(--ok-soft);color:var(--ok)}.r-중간{background:var(--warn-soft);color:var(--warn)}.r-높음{background:var(--bad-soft);color:var(--bad)}
 </style>
 
@@ -117,6 +122,8 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     <div>
       <h1 id="title">PM 총괄판</h1>
       <div class="sub" id="updated">불러오는 중…</div>
+      <div class="sub" id="verbox"></div>
+      <div id="vermsg" class="adv" hidden></div>
     </div>
     <div class="status" id="netnote" hidden></div>
   </header>
@@ -125,6 +132,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     <a href="#board" role="tab" id="t-board" aria-selected="true">현황판</a>
     <a href="#config" role="tab" id="t-config" aria-selected="false">설정 한눈에</a>
     <a href="#ctl" role="tab" id="t-ctl" aria-selected="false">AI 통제 점검</a>
+    <a href="#eval" role="tab" id="t-eval" aria-selected="false">평가</a>
   </nav>
 
   <div id="tab-board" class="tabpane">
@@ -210,6 +218,19 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
       <div id="adv-ctl"></div></section>
     <div id="ctl-areas"></div>
   </div>
+
+  <div id="tab-eval" class="tabpane" hidden>
+    <section><h2>총괄 평가 <span class="n" id="ev-when"></span></h2>
+      <p class="note">「평가하기」를 누르면 ① 총괄판 데이터를 자동으로 시험하고(일정 · 검수 · 비용 · 결정 · 기록 · 설정 6개 면, 시험 약 16개) ② Claude 가 시험 결과와 데이터를 읽고 면마다 점수와 보완할 점을 씁니다(내 Claude 사용량을 씁니다, 1~2분). 페이지는 아무것도 바꾸지 않습니다.</p>
+      <div class="btns"><button type="button" class="btn" id="b-eval" hidden>평가하기</button></div>
+      <p class="note" id="ev-msg"></p>
+      <div class="tiles" id="ev-tiles"></div>
+    </section>
+    <div id="ev-angles"></div>
+    <section id="ev-impbox" hidden><h2>보완할 점 <span class="n" id="ev-nimp"></span></h2>
+      <p class="note">「PM 에게 보내기」를 누르면 보낼 말이 메인 PM 세션이 읽는 우편함(inbox)에 쌓이고 클립보드에도 복사됩니다. PM 은 다음에 총괄판을 볼 때 읽고 검토 · 보완 · 질문창 순서로 처리합니다. 급하면 복사된 말을 PM 세션에 바로 붙여 넣으세요.</p>
+      <div id="ev-imps" class="adv"></div></section>
+  </div>
 </div>
 
 <script>
@@ -217,7 +238,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
   const $=id=>document.getElementById(id);
   const ST=["진행","검수","대표","막힘","대기","보류","완료","보관"];
   const COLOR={"진행":"var(--accent)","검수":"var(--accent)","대표":"var(--warn)","막힘":"var(--bad)","대기":"var(--idle)","보류":"var(--idle)","완료":"var(--ok)","보관":"var(--idle)"};
-  const S={meta:null,usage:null,config:null,ctl:null,projects:[],tasks:[],asks:[],sessions:[],glossary:[],log:[]};
+  const S={meta:null,usage:null,config:null,ctl:null,eval:null,projects:[],tasks:[],asks:[],sessions:[],glossary:[],log:[]};
   let gotFresh=false;
 
   function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -406,18 +427,148 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
   $("b-ctl").addEventListener("click",e=>runAdvice("ctl",e.currentTarget));
   function ctlGuide(code){const a=ADV.ctl;if(!a||!Array.isArray(a.items))return "";const g=a.items.find(x=>String(x.code)===code);if(!g)return "";
     return '<details><summary>해결 가이드 · 약 '+esc(g.hours??"?")+'시간</summary><div class="card"><div><b>'+esc(g.summary||"")+'</b></div><ol>'+(Array.isArray(g.steps)?g.steps:[]).slice(0,8).map(s=>'<li>'+esc(s)+'</li>').join("")+'</ol>'+(g.first?'<div class="note">오늘 할 첫 걸음: '+esc(g.first)+'</div>':'')+sayBox(g.say)+'</div></details>'}
+  /* ---- 평가 탭 ---- */
+  const ANG=[["plan","일정 · 예상"],["review","검수 품질"],["cost","비용 · 사용량"],["decide","결정 · 소통"],["data","기록 · 정합성"],["safe","설정 · 통제"]];
+  const angName=k=>(ANG.find(a=>a[0]===k)||[k,k])[1];
+  const scCls=n=>n>=80?"sc-hi":n>=60?"sc-mid":"sc-lo";
+  function runTests(){
+    const T=[];const add=(angle,name,ok,detail)=>T.push({angle,name,ok,detail:detail||""});
+    const tk=S.tasks,ss=S.sessions;const act=tk.filter(t=>t.status!=="완료"&&t.status!=="보관");
+    const names=l=>l.map(t=>t.title||t.name||t.id).slice(0,4).join(", ");
+    const over=tk.filter(t=>t.est_h&&t.spent_h&&t.spent_h>t.est_h*2);
+    add("plan","실제 시간이 예상의 2배를 넘는 일이 없다",!over.length,over.length?names(over):"");
+    const noest=act.filter(t=>!t.est_h);
+    add("plan","끝나지 않은 일에 모두 예상 시간이 있다",!noest.length,noest.length?names(noest):"");
+    const blk=tk.filter(t=>t.status==="막힘");
+    add("plan","막힌 일이 없다",!blk.length,blk.length?names(blk):"");
+    const nospent=tk.filter(t=>t.status==="완료"&&!t.spent_h);
+    add("plan","끝난 일에 실제 시간이 적혀 있다",!nospent.length,nospent.length?names(nospent):"");
+    const noRev=tk.filter(t=>t.status==="완료"&&t.review!=="통과");
+    add("review","끝난 일은 모두 검수를 통과했다",!noRev.length,noRev.length?names(noRev):"");
+    const rej=tk.filter(t=>t.review==="반려");
+    add("review","반려된 채 남은 일이 없다",!rej.length,rej.length?names(rej):"");
+    const noEv=tk.filter(t=>t.status==="완료"&&!t.evidence&&!t.pr);
+    add("review","끝난 일에 완료 근거(PR · 시험 결과)가 있다",!noEv.length,noEv.length?names(noEv):"");
+    add("cost","사용량 · 금액 집계가 올라와 있다",!!S.usage,S.usage?"":"usage/main 없음");
+    const bigrun=ss.filter(s=>s.status==="진행"&&/opus|fable/i.test(s.model||""));
+    add("cost","비싼 모델(opus · fable)로 도는 세션이 많지 않다",bigrun.length<=2,bigrun.length+"개");
+    const open=S.asks.filter(a=>a.status!=="답함"&&a.status!=="끝");
+    add("decide","대표님 대기 질문이 3건 이하다",open.length<=3,open.length+"건");
+    const stale=ss.filter(s=>s.status==="대표");
+    add("decide","대표님 답을 기다리며 멈춘 세션이 없다",!stale.length,stale.length?names(stale):"");
+    const arch=ss.filter(s=>s.status==="보관"&&tk.some(t=>t.session===s.name&&(t.status==="진행"||t.status==="검수")));
+    add("data","보관된 세션에 진행 중인 일이 걸려 있지 않다",!arch.length,arch.length?names(arch):"");
+    add("data","최근 기록이 30개 이하다",S.log.length<=30,S.log.length+"개");
+    const nom=tk.filter(t=>!t.model||!t.effort);
+    add("data","모든 일에 모델 · 노력이 적혀 있다",!nom.length,nom.length?names(nom):"");
+    const empt=S.projects.filter(p=>!tk.some(t=>t.project===p.id));
+    add("data","일이 없는 빈 프로젝트가 없다",!empt.length,empt.length?empt.map(p=>p.name).join(", "):"");
+    add("safe","설정 목록(스킬 · 훅 · 권한)이 올라와 있다",!!S.config,S.config?"":"config/main 없음");
+    const it=(S.ctl&&S.ctl.items)||null;
+    if(it){const no=it.filter(i=>i.status==="없음").length;add("safe","AI 통제 점검에 「없음」 항목이 없다",!no,no+"개")}
+    else T.push({angle:"safe",name:"AI 통제 점검 결과가 있다",ok:null,detail:"점검 목록이 올라오지 않아 건너뜀"});
+    return T}
+  function evDigest(tests){
+    const c=t=>({id:t.id,title:t.title,status:t.status,kind:t.kind,model:t.model,effort:t.effort,est:t.est_h,spent:t.spent_h,review:t.review});
+    return JSON.stringify({진행방식:(S.meta||{}).mode,프로젝트:S.projects.map(p=>({id:p.id,name:p.name,status:p.status,note:p.note})),
+      할일:S.tasks.map(c),세션:S.sessions.map(s=>({name:s.name,status:s.status,model:s.model,effort:s.effort,result:s.result})),
+      대기질문:S.asks.filter(a=>a.status!=="답함"&&a.status!=="끝").map(a=>a.question),최근기록:S.log.slice(0,12).map(l=>l.at+" "+l.text),
+      사용량:S.usage?{krw:S.usage.krw,usd:S.usage.usd,requests:S.usage.requests,scope:S.usage.scope}:null,
+      설정개수:S.config?S.config.counts:null,통제점검:S.ctl?{없음:(S.ctl.items||[]).filter(i=>i.status==="없음").length,부분:(S.ctl.items||[]).filter(i=>i.status==="부분 충족").length}:null,
+      자동시험:tests.map(t=>({angle:t.angle,name:t.name,ok:t.ok,detail:t.detail}))}).slice(0,50000)}
+  function evPrompt(tests){return "너는 프로젝트 총괄(PM) 업무를 평가하는 감사자다. 아래 JSON 은 총괄판 데이터와 자동 시험 결과다. 6개 면(plan 일정·예상, review 검수 품질, cost 비용·사용량, decide 결정·소통, data 기록·정합성, safe 설정·통제)을 각각 0~100 점으로 평가하고 한 줄 근거를 써라. 자동 시험의 실패와 데이터의 구체적 사실(할 일 · 세션 이름)을 근거로 하고 지어내지 마라. 데이터가 없어 판단할 수 없으면 score 를 null 로 하고 이유를 써라. 보완할 점은 중요한 순서로 최대 10개, 각각 어느 면인지, 왜 필요한지, 우선순위(높음|중간|낮음), 메인 PM 세션에 보낼 한 문장 지시(say)를 써라. "+RULE+"\n\n답은 JSON 객체 하나만: {\"angles\":[{\"key\":\"plan\",\"score\":숫자|null,\"comment\":\"한 줄 근거\"}],\"overall\":\"전체 한두 문장 총평\",\"improvements\":[{\"angle\":\"plan\",\"title\":\"보완할 점 제목\",\"why\":\"왜 필요한지 1~2문장\",\"priority\":\"높음|중간|낮음\",\"say\":\"PM 에게 보낼 한 문장\"}]}\n\n"+evDigest(tests)}
+  function renderEval(){
+    const e=S.eval;const btn=$("b-eval");
+    if(!e){$("ev-when").textContent="";$("ev-tiles").innerHTML='<div class="empty">아직 평가한 적이 없습니다. 「평가하기」를 눌러 주세요.</div>';$("ev-angles").innerHTML="";$("ev-impbox").hidden=true;return}
+    $("ev-when").textContent=e.at||"";
+    const A=e.angles||[];const sc=A.map(a=>a.score).filter(n=>typeof n==="number");
+    const avg=sc.length?Math.round(sc.reduce((a,b)=>a+b,0)/sc.length):null;
+    const tests=e.tests||[];const ng=tests.filter(t=>t.ok===false).length;
+    $("ev-tiles").innerHTML=['<div class="tile"><b class="'+(avg==null?"":scCls(avg))+'">'+(avg==null?"–":avg)+'</b><span>종합 점수 (100점)</span></div>',
+      '<div class="tile"><b>'+tests.filter(t=>t.ok===true).length+" / "+tests.filter(t=>t.ok!==null).length+'</b><span>자동 시험 통과</span></div>',
+      '<div class="tile'+(ng?' hot':'')+'"><b>'+ng+'</b><span>실패한 시험</span></div>',
+      '<div class="tile"><b>'+(e.improvements||[]).length+'</b><span>보완할 점</span></div>'].join("")+(e.overall?'<p class="note" style="grid-column:1/-1">'+esc(e.overall)+'</p>':"");
+    $("ev-angles").innerHTML=ANG.map(([k,nm])=>{const a=A.find(x=>x.key===k)||{};const L=tests.filter(t=>t.angle===k);
+      return '<section><h2>'+esc(nm)+' <span class="n '+(typeof a.score==="number"?scCls(a.score):"")+'" style="font-size:15px;font-weight:700">'+(typeof a.score==="number"?a.score+"점":"판단 보류")+'</span></h2>'+
+        (a.comment?'<p style="margin:0">'+esc(a.comment)+'</p>':"")+
+        '<ul class="tl">'+L.map(t=>'<li><span class="m '+(t.ok===true?"ok":t.ok===false?"ng":"sk")+'">'+(t.ok===true?"✓":t.ok===false?"✗":"–")+'</span><span>'+esc(t.name)+(t.detail?' <span class="note">· '+esc(t.detail)+'</span>':"")+'</span></li>').join("")+'</ul></section>'}).join("");
+    const P=(e.improvements||[]);$("ev-impbox").hidden=!P.length;$("ev-nimp").textContent=P.length+"개";
+    $("ev-imps").innerHTML=P.map((x,i)=>{return '<div class="card"><div><span class="chip p-'+esc(x.priority||"중간")+'">'+esc(x.priority||"중간")+'</span> <b>'+esc(x.title||"")+'</b> <span class="tag">'+esc(angName(x.angle))+'</span></div><div>'+esc(x.why||"")+'</div>'+
+        '<div class="say"><span>PM 에게 보낼 말: '+esc(x.say||"")+'</span><button type="button" class="btn ghost sm" data-send="'+esc((x.title?x.title+' — ':'')+(x.say||''))+'">PM 에게 보내기</button></div></div>'}).join("")}
+  $("b-eval").addEventListener("click",async e=>{
+    if(!SAMPLE)return;const btn=e.currentTarget;btn.disabled=true;const label=btn.textContent;btn.textContent="평가하는 중…";
+    $("ev-msg").textContent="① 자동 시험을 돌리는 중…";
+    try{const tests=runTests();$("ev-msg").textContent="② Claude 가 면마다 평가하는 중입니다. 1~2분 걸릴 수 있습니다.";
+      const out=await SAMPLE.json(evPrompt(tests),{cache:false});
+      if(!out||typeof out!=="object"||!Array.isArray(out.angles))throw {code:"invalid_json"};
+      const doc={at:new Date().toLocaleString("ko-KR",{hour12:false}).slice(0,-3),tests,
+        angles:out.angles.filter(a=>a&&ANG.some(x=>x[0]===a.key)).map(a=>({key:a.key,score:typeof a.score==="number"?Math.max(0,Math.min(100,Math.round(a.score))):null,comment:String(a.comment||"")})),
+        overall:String(out.overall||""),improvements:(Array.isArray(out.improvements)?out.improvements:[]).filter(x=>x&&typeof x==="object").slice(0,10).map(x=>({angle:String(x.angle||""),title:String(x.title||""),why:String(x.why||""),priority:["높음","중간","낮음"].includes(x.priority)?x.priority:"중간",say:String(x.say||"")}))};
+      S.eval=doc;renderEval();$("ev-msg").textContent="";
+      try{await DB.doc("eval/main").set(doc)}catch(_){$("ev-msg").textContent="이 평가는 저장하지 못했습니다. 페이지를 다시 열면 사라집니다."}}
+    catch(err){const m={not_granted:"Claude 사용을 허락하지 않아 평가할 수 없습니다.",rate_limited:"사용 한도에 닿았습니다. 잠시 뒤 다시 눌러 주세요.",invalid_json:"답을 읽지 못했습니다. 한 번 더 눌러 주세요."};$("ev-msg").textContent=m[err&&err.code]||"평가하지 못했습니다. 잠시 뒤 다시 눌러 주세요."}
+    finally{btn.disabled=false;btn.textContent=label}});
   function showTab(){
-    const h=(location.hash||"#board").slice(1);const t=["board","config","ctl"].includes(h)?h:(/^g-/.test(h)?"board":"board");
-    ["board","config","ctl"].forEach(x=>{$("tab-"+x).hidden=x!==t;$("t-"+x).setAttribute("aria-selected",String(x===t))});
+    const h=(location.hash||"#board").slice(1);const t=["board","config","ctl","eval"].includes(h)?h:"board";
+    ["board","config","ctl","eval"].forEach(x=>{$("tab-"+x).hidden=x!==t;$("t-"+x).setAttribute("aria-selected",String(x===t))});
   }
   window.addEventListener("hashchange",showTab);
-  function renderAll(){renderUsage();renderConfig();renderCtl();showTab();renderMeta();renderAsks();renderTiles();renderTree();renderSessions();renderTodo();renderGlossary();renderLog()}
+  function renderAll(){renderUsage();renderConfig();renderCtl();renderEval();showTab();renderMeta();renderAsks();renderTiles();renderTree();renderSessions();renderTodo();renderGlossary();renderLog()}
   function focusHash(){
     const m=/^#g-([A-Za-z0-9-]+)$/.exec(location.hash);if(!m)return;
     const el=document.getElementById("g-"+m[1]);if(!el)return;
     el.classList.add("flash");el.scrollIntoView({block:"center"});setTimeout(()=>el.classList.remove("flash"),1800);
   }
   window.addEventListener("hashchange",focusHash);
+  /* ---- 버전 확인 · 최신버전 업데이트 ----
+     최신 번호는 공개 저장소(akokai79/pm-hub)의 plugin.json 에서 읽는다. 업데이트는 같은 저장소의 dashboard.html 을 받아 이 페이지를 스스로 다시 올린다(artifact 권한).
+     스킬(플러그인) 파일은 이 페이지가 바꿀 수 없다 — claude plugin update pm-hub@pm-hub 를 따로 한다. */
+  const PMHUB_VERSION="1.9.0";
+  const RAW="https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/";
+  const SKEL_HEAD='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
+  let LATEST="",armed=false,updating=false;
+  const vnew=(a,b)=>{const x=String(a).split(".").map(Number),y=String(b).split(".").map(Number);for(let i=0;i<3;i++){const d=(x[i]||0)-(y[i]||0);if(d)return d}return 0};
+  function showVer(){
+    const b=$("verbox");const cur="버전 "+PMHUB_VERSION;
+    if(!LATEST){b.innerHTML=esc(cur)+' · 최신 버전을 확인하지 못했습니다 <button type="button" class="btn ghost sm" id="b-vchk">다시 확인</button>';return}
+    if(vnew(LATEST,PMHUB_VERSION)>0)b.innerHTML=esc(cur)+' · <span class="chip s-대표">새 버전 '+esc(LATEST)+' 있음</span> <button type="button" class="btn sm" id="b-upd">최신버전 업데이트</button>';
+    else b.innerHTML=esc(cur)+' · <span class="chip s-완료">최신 버전입니다</span>';
+  }
+  async function checkVersion(){
+    $("verbox").textContent="버전 "+PMHUB_VERSION+" · 최신 버전 확인 중…";
+    try{const r=await fetch(RAW+".claude-plugin/plugin.json",{cache:"no-store"});if(!r.ok)throw 0;const j=await r.json();const v=String(j.version||"");if(!/^\d+\.\d+\.\d+$/.test(v))throw 0;LATEST=v}catch(_){LATEST=""}
+    showVer()}
+  function verMsg(html){const m=$("vermsg");m.hidden=!html;m.innerHTML=html||""}
+  function fallbackMsg(why){
+    const t="PM 총괄판 아티팩트를 최신 버전("+LATEST+")으로 올려줘. 스킬 폴더의 dashboard.html 을 같은 주소에 다시 올리고, capabilities 에 artifact 를 넣어 줘. 데이터는 그대로 두고.";
+    verMsg('<div class="card"><div>'+esc(why)+'</div>'+sayBox(t)+'<div class="say"><span>스킬(플러그인) 파일도 따로 올리려면 터미널에서: <code>claude plugin update pm-hub@pm-hub</code></span><button type="button" class="btn ghost sm" data-cp="claude plugin update pm-hub@pm-hub">복사</button></div></div>')}
+  async function doUpdate(btn){
+    if(updating)return;
+    if(!armed){armed=true;btn.textContent="정말 업데이트 (한 번 더 누르기)";setTimeout(()=>{armed=false;if(btn.isConnected&&!updating)btn.textContent="최신버전 업데이트"},7000);return}
+    updating=true;btn.disabled=true;btn.textContent="받는 중…";verMsg("");
+    try{
+      const r=await fetch(RAW+"skills/pm-hub/dashboard.html",{cache:"no-store"});if(!r.ok)throw {code:"fetch"};
+      const html=await r.text();
+      if(!html.includes('const PMHUB_VERSION="'+LATEST+'"')||html.indexOf("</script>")<0||html.length<20000)throw {code:"bad"};
+      let art=null;try{art=await window.claude.use("artifact")}catch(_){art=null}
+      if(!art){fallbackMsg("이 총괄판에는 스스로 업데이트하는 권한이 아직 없습니다(옛 버전으로 만들어졌습니다). 아래 말을 PM 세션에 보내 한 번만 올려 달라고 하세요. 그다음부터는 이 버튼으로 됩니다.");return}
+      btn.textContent="올리는 중…";
+      await art.publish(SKEL_HEAD+html+"</body></html>");
+      verMsg('<div class="note">업데이트했습니다. 곧 새 화면으로 바뀝니다.</div>');
+    }catch(e){const c=e&&e.code;
+      if(c==="conflict")verMsg('<div class="note">다른 곳에서 먼저 바뀌었습니다. 새로고침한 뒤 다시 확인해 주세요.</div>');
+      else if(c==="not_granted"||c==="not_writer")fallbackMsg("이 화면에서는 고칠 권한이 없습니다(보기 전용). 아래 말을 PM 세션에 보내세요.");
+      else if(c==="bad")verMsg('<div class="note">받은 파일이 올바르지 않아 업데이트하지 않았습니다. 잠시 뒤(저장소 반영에 몇 분 걸릴 수 있음) 다시 눌러 주세요.</div>');
+      else fallbackMsg("저장소에서 파일을 받지 못했습니다(화면 보안 설정이 막았을 수 있습니다). 아래 말을 PM 세션에 보내 올려 달라고 하세요.")}
+    finally{updating=false;armed=false;if(btn.isConnected){btn.disabled=false;btn.textContent="최신버전 업데이트"}}}
+  document.addEventListener("click",async e=>{
+    const u=e.target.closest("#b-upd");if(u){doUpdate(u);return}
+    if(e.target.closest("#b-vchk")){checkVersion();return}
+    const c=e.target.closest("[data-cp]");if(!c)return;
+    try{await navigator.clipboard.writeText(c.dataset.cp);c.textContent="복사됨"}catch(_){c.textContent="복사하지 못함"}
+    setTimeout(()=>{c.textContent="복사"},1500)});
+  checkVersion();
+
   renderAll();
 
   (async()=>{
@@ -431,9 +582,10 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     db.doc("config/main").onSnapshot(s=>{S.config=s.exists?s.data():null;renderAll()},onErr);
     db.doc("ctl/main").onSnapshot(s=>{S.ctl=s.exists?s.data():null;renderAll()},onErr);
     DB=db;
+    db.doc("eval/main").onSnapshot(s=>{S.eval=s.exists?s.data():null;renderEval()},()=>{});
     ["del","add","ctl"].forEach(k=>db.doc("advice/"+k).onSnapshot(s=>{if(s.exists){ADV[k]=s.data();renderAdvice(k)}},()=>{}));
     let sp=null;try{sp=await window.claude.use("sample")}catch(_){sp=null}
-    if(sp){SAMPLE=sp;["cfg-btns","ctl-btns","cfg-ai-note","ctl-ai-note"].forEach(id=>$(id).hidden=false)}
+    if(sp){SAMPLE=sp;$("b-eval").hidden=false;["cfg-btns","ctl-btns","cfg-ai-note","ctl-ai-note"].forEach(id=>$(id).hidden=false)}
     ["projects","tasks","asks","sessions","glossary","log"].forEach(c=>{
       db.collection(c).onSnapshot(q=>{S[c]=q.docs.map(d=>Object.assign({id:d.id},d.data()));fresh(q.metadata);renderAll()},onErr);
     });
