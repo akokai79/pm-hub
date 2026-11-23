@@ -383,13 +383,17 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
   }
   /* ---- AI 추천 (sample) ---- */
   let SAMPLE=null,DB=null;const ADV={};
-  function sayBox(t){return t?'<div class="say"><span>PM 에게 보낼 말: '+esc(t)+'</span><button type="button" class="btn ghost sm" data-send="'+esc(t)+'">PM 에게 보내기</button></div>':''}
+  const INBOX={};
+  function inboxOf(ref){let r=null;Object.keys(INBOX).forEach(k=>{const m=INBOX[k];if(m&&m.ref===ref&&(!r||String(m.at||"")>=String(r.at||"")))r=m});return r}
+  function sayBox(t,ref){if(!t)return"";const m=ref?inboxOf(ref):null;
+    if(m&&m.status!=="처리")return '<div class="say"><span>PM 에게 보낼 말: '+esc(t)+'</span><button type="button" class="btn ghost sm" disabled>'+(m.status==="받음"?"PM 이 받음 ✓ (처리 중)":"보냄 ✓ (PM 이 다음 턴에 처리)")+'</button></div>';
+    return '<div class="say"><span>PM 에게 보낼 말: '+esc(t)+'</span><button type="button" class="btn ghost sm" data-send="'+esc(t)+'"'+(ref?' data-ref="'+esc(ref)+'"':'')+'>PM 에게 보내기</button></div>'}
   /* 「PM 에게 보내기」: inbox 컬렉션에 쌓는다. PM 세션이 매 턴 inbox(status=새로) 를 읽어 처리하고 「받음」으로 바꾼다. */
   document.addEventListener("click",async e=>{const b=e.target.closest("[data-send]");if(!b||b.disabled)return;
     if(!DB){b.textContent="보낼 수 없음 (저장소 없음)";return}
     b.disabled=true;b.textContent="보내는 중…";
     const id="m"+Date.now().toString(36);const d=new Date(),p=n=>String(n).padStart(2,"0");
-    try{await DB.doc("inbox/"+id).set({text:b.dataset.send,status:"새로",at:p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())});
+    try{const doc={text:b.dataset.send,status:"새로",at:p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())};if(b.dataset.ref)doc.ref=b.dataset.ref;await DB.doc("inbox/"+id).set(doc);if(doc.ref){INBOX[id]=doc;["del","add"].forEach(k=>renderAdvice(k))}
       b.textContent="보냄 ✓ (PM 이 다음 턴에 처리)"}
     catch(_){b.disabled=false;b.textContent="보내지 못함 · 다시 누르기"}});
   function cfgDigest(){const c=S.config||{};const L=[];
@@ -412,7 +416,10 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     if(kind==="ctl"){renderCtl();if(!a||!Array.isArray(a.items)||!a.items.length){box.innerHTML="";return}box.innerHTML='<div class="adv"><h3>해결 솔루션 가이드 <span class="n">'+esc(a.at||"")+' · 각 항목 아래에 붙였습니다</span></h3></div>';return}
     if(!a||!Array.isArray(a.items)){box.innerHTML="";return}
     const title=kind==="del"?"삭제 추천":"추가 추천";
-    box.innerHTML='<div class="adv"><h3>'+title+' <span class="n">'+esc(a.at||"")+' · '+a.items.length+'개</span></h3>'+a.items.map(x=>'<div class="card"><div><span class="chip r-'+esc(x.risk||"중간")+'">위험 '+esc(x.risk||"?")+'</span> <b>'+esc(x.target||x.title||"")+'</b> <span class="tag">'+esc(x.kind||"")+'</span></div><div>'+esc(x.why||"")+'</div>'+(x.benefit?'<div class="note">'+esc(x.benefit)+'</div>':'')+sayBox(x.say)+'</div>').join("")+'</div>'}
+    box.innerHTML='<div class="adv"><h3>'+title+' <span class="n">'+esc(a.at||"")+' · '+a.items.length+'개</span></h3>'+a.items.map(x=>{const ref=kind+":"+(x.target||x.title||"");const m=inboxOf(ref);const head='<span class="chip r-'+esc(x.risk||"중간")+'">위험 '+esc(x.risk||"?")+'</span> <b>'+esc(x.target||x.title||"")+'</b> <span class="tag">'+esc(x.kind||"")+'</span>';
+      const body='<div>'+esc(x.why||"")+'</div>'+(x.benefit?'<div class="note">'+esc(x.benefit)+'</div>':'');
+      if(m&&m.status==="처리")return '<details class="card"><summary>'+head+' <span class="chip">처리됨 ✓'+(m.done?' · '+esc(m.done):'')+'</span></summary>'+body+'</details>';
+      return '<div class="card"><div>'+head+(m?' <span class="chip">'+(m.status==="받음"?"PM 이 받음":"PM 에게 보냄")+'</span>':'')+'</div>'+body+sayBox(x.say,ref)+'</div>'}).join("")+'</div>'}
   async function runAdvice(kind,btn){
     if(!SAMPLE)return;const box=$("adv-"+kind);const label=btn.textContent;btn.disabled=true;btn.textContent="생각하는 중…";
     if(kind!=="ctl")box.innerHTML='<div class="adv"><div class="note">Claude 가 설정을 읽고 있습니다. 보통 30초~1분 걸립니다.</div></div>';
@@ -527,7 +534,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
      meta/main 의 latest_version · latest_checked 에 적어 둔다. 화면은 먼저 직접 읽어 보고(되면 바로), 안 되면 그 값을 쓴다.
      업데이트: 직접 받아 스스로 다시 올려 보고(artifact 권한), 안 되면 PM 에게 요청(inbox)을 보낸다 — PM 이 다음 턴에 올린다.
      스킬(플러그인) 파일은 이 페이지가 바꿀 수 없다 — claude plugin update pm-hub@pm-hub 를 따로 한다. */
-  const PMHUB_VERSION="1.10.0";
+  const PMHUB_VERSION="1.10.1";
   const RAW="https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/";
   const SKEL_HEAD='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
   let LATEST="",vdone=false,armed=false,updating=false,asked=false;
@@ -599,6 +606,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     db.doc("ctl/main").onSnapshot(s=>{S.ctl=s.exists?s.data():null;renderAll()},onErr);
     DB=db;
     db.doc("eval/main").onSnapshot(s=>{S.eval=s.exists?s.data():null;renderEval()},()=>{});
+    db.collection("inbox").onSnapshot(q=>{Object.keys(INBOX).forEach(k=>delete INBOX[k]);q.docs.forEach(d=>{INBOX[d.id]=d.data()});["del","add"].forEach(k=>renderAdvice(k))},()=>{});
     ["del","add","ctl"].forEach(k=>db.doc("advice/"+k).onSnapshot(s=>{if(s.exists){ADV[k]=s.data();renderAdvice(k)}},()=>{}));
     let sp=null;try{sp=await window.claude.use("sample")}catch(_){sp=null}
     if(sp){SAMPLE=sp;$("b-eval").hidden=false;["cfg-btns","cfg-ai-note"].forEach(id=>$(id).hidden=false);renderCtl()}
