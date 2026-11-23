@@ -527,7 +527,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
      meta/main 의 latest_version · latest_checked 에 적어 둔다. 화면은 먼저 직접 읽어 보고(되면 바로), 안 되면 그 값을 쓴다.
      업데이트: 직접 받아 스스로 다시 올려 보고(artifact 권한), 안 되면 PM 에게 요청(inbox)을 보낸다 — PM 이 다음 턴에 올린다.
      스킬(플러그인) 파일은 이 페이지가 바꿀 수 없다 — claude plugin update pm-hub@pm-hub 를 따로 한다. */
-  const PMHUB_VERSION="1.9.3";
+  const PMHUB_VERSION="1.10.0";
   const RAW="https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/";
   const SKEL_HEAD='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
   let LATEST="",vdone=false,armed=false,updating=false,asked=false;
@@ -538,7 +538,15 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     if(!vdone)return;const b=$("verbox");const cur="버전 "+PMHUB_VERSION;const L=latestNow();
     const when=(S.meta&&S.meta.latest_checked)?" (PM 확인 "+S.meta.latest_checked+")":"";
     if(!L){b.innerHTML=esc(cur)+' · 최신 버전은 PM 이 확인해 알려 줍니다 <button type="button" class="btn ghost sm" id="b-vchk">다시 확인</button> <button type="button" class="btn ghost sm" id="b-vask">PM 에게 확인 요청</button>';return}
-    if(vnew(L,PMHUB_VERSION)>0)b.innerHTML=esc(cur)+' · <span class="chip s-대표">새 버전 '+esc(L)+' 있음</span> <button type="button" class="btn sm" id="b-upd">최신버전 업데이트</button>';
+    if(vnew(L,PMHUB_VERSION)>0){
+      const uc=S.meta&&S.meta.update_check;const has=uc&&uc.to===L&&uc.from===PMHUB_VERSION&&Array.isArray(uc.items);
+      const head=esc(cur)+' · <span class="chip s-대표">새 버전 '+esc(L)+' 있음</span> ';
+      if(!has){b.innerHTML=head+'<button type="button" class="btn sm" id="b-ucheck">업데이트 검수하기</button><div class="note">먼저 검수합니다: PM 이 새 버전의 오류 · 충돌 가능성을 점검한 뒤 결과가 여기에 나타나고, 이상이 없을 때만 「최신버전 업데이트」 단추가 나옵니다.</div>';return}
+      const er=uc.items.filter(i=>i.level==="오류").length,wr=uc.items.filter(i=>i.level==="주의").length;
+      const list='<details'+(uc.ok?'':' open')+'><summary>검수 결과 · 오류 '+er+' · 주의 '+wr+' <span class="note">('+esc(uc.at||"")+')</span></summary><ul class="tl">'+uc.items.map(i=>'<li><span class="m '+(i.level==="오류"?"ng":i.level==="주의"?"sk":"ok")+'">'+(i.level==="오류"?"✗":i.level==="주의"?"!":"✓")+'</span><span>'+esc(i.text)+'</span></li>').join("")+'</ul></details>';
+      if(uc.ok)b.innerHTML=head+'<span class="chip s-완료">검수 통과</span> <button type="button" class="btn sm" id="b-upd">최신버전 업데이트</button>'+list;
+      else b.innerHTML=head+'<span class="chip s-막힘">문제 발견 · 업데이트 보류</span> <button type="button" class="btn ghost sm" id="b-ucheck">다시 검수하기</button>'+list+'<div class="note">문제가 고쳐진 새 버전이 나오면 다시 검수합니다. 급하면 PM 세션에 상의하세요.</div>';
+      return}
     else b.innerHTML=esc(cur)+' · <span class="chip s-완료">최신 버전입니다</span><span class="note">'+esc(when)+'</span> <button type="button" class="btn ghost sm" id="b-vchk">다시 확인</button>';
   }
   async function checkVersion(){
@@ -570,6 +578,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
   document.addEventListener("click",async e=>{
     const u=e.target.closest("#b-upd");if(u){doUpdate(u);return}
     if(e.target.closest("#b-vchk")){verMsg("");await checkVersion();const L=latestNow();verMsg('<div class="note">'+(L?"확인했습니다. 최신 번호는 "+esc(L)+" 입니다.":"이 화면에서는 저장소를 직접 읽을 수 없습니다. PM 세션이 확인해 적어 두면 여기에 나타납니다. 지금 알고 싶으면 「PM 에게 확인 요청」을 누르세요.")+'</div>');return}
+    const uk=e.target.closest("#b-ucheck");if(uk){uk.disabled=true;if(await askPM("총괄판 업데이트를 검수해줘: 지금 "+PMHUB_VERSION+" → 최신 "+latestNow()+". 저장소(akokai79/pm-hub)의 최신 dashboard.html 을 받아 update-check.py 로 오류 · 충돌 가능성을 점검하고, 결과를 meta/main 의 update_check(from · to · ok · items · at)에 적어 줘. 이상이 없을 때만 업데이트 단추가 나오게 돼 있어."))verMsg('<div class="card"><div>검수 요청을 PM 에게 보냈습니다. PM 세션이 다음 턴에 점검하고, 결과가 이 자리에 나타납니다. 급하면 PM 세션에 「총괄판 업데이트 검수」라고 말하세요.</div></div>');uk.disabled=false;return}
     const k=e.target.closest("#b-vask");if(k){k.disabled=true;if(await askPM("PM 총괄판의 최신 버전을 확인해 알려 주고, 새 버전이 있으면 총괄판을 업데이트해줘. (저장소 akokai79/pm-hub 의 plugin.json 번호를 meta/main latest_version 에 적어 줘)"))sentMsg();k.disabled=false;return}
     const c=e.target.closest("[data-cp]");if(!c)return;
     try{await navigator.clipboard.writeText(c.dataset.cp);c.textContent="복사됨"}catch(_){c.textContent="복사하지 못함"}

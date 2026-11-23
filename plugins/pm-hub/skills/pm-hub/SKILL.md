@@ -184,14 +184,19 @@ description: 메인(PM) 세션으로 일할 때 반드시 이 스킬을 쓴다. 
 4. 결정 · 승인 항목은 마지막에 질문창으로 한 번에 띄운다(최대 4개).
 5. 대표님 할 일이 없으면 「지금 하실 것은 없습니다」 한 줄과 기다리는 것만 적는다.
 
-## 3-4-1. 「총괄판 업데이트」 (총괄판 · 스킬 최신 버전)
+## 3-4-1. 「총괄판 업데이트」 (총괄판 · 스킬 최신 버전 · 검수 먼저)
 
-- 총괄판 맨 위에 현재 버전과 「새 버전 있음 · 최신버전 업데이트」 단추가 있다. 총괄판 화면(보안 샌드박스)은 외부 주소를 못 읽을 수 있어서, **최신 번호는 PM 이 적는다**:
-  - 하루 첫 대화(또는 대표가 「총괄판 업데이트」 · 「버전」이라고 할 때)에 `curl -s https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/.claude-plugin/plugin.json` 의 `version` 을 읽어 `ArtifactData update meta/main` 으로 `latest_version` · `latest_checked`("MM-DD HH:MM")를 적는다(다른 칸은 건드리지 않는다). 읽지 못하면(오프라인) 적지 않는다.
-- 단추를 두 번 누르면 화면이 직접 받아 올려 보고, 안 되면 inbox 에 「총괄판을 최신 버전으로 업데이트해줘」 요청을 쌓는다. PM 이 그 요청(또는 대표의 「총괄판 업데이트」 한마디)을 받으면:
-  1. 저장소의 최신 `dashboard.html` 을 받아(`curl -s .../skills/pm-hub/dashboard.html -o <scratchpad>/pm-dashboard-latest.html`) 파일 안 `PMHUB_VERSION` 이 `latest_version` 과 같은지 확인한다(설치된 스킬 폴더 사본이 더 옛것일 수 있으니 저장소 사본을 쓴다).
-  2. 총괄판을 `Artifact read` 로 읽은 뒤, 그 파일을 총괄판 URL 로 올린다(`url` 지정, `capabilities` 에 `db` · `sample` · `artifact` 모두). 데이터(ArtifactData)는 그대로다.
-  3. inbox 를 「처리」로 바꾸고 대표께 한 줄로 알린다.
+총괄판 맨 위 순서: **버전 확인 → 업데이트 검수 → (이상 없을 때만) 업데이트 단추**. 총괄판 화면(보안 샌드박스)은 외부 주소를 못 읽을 수 있어서 최신 번호 · 검수는 PM 이 한다.
+
+1. **최신 번호 적기**: 하루 첫 대화(또는 대표가 「총괄판 업데이트」 · 「버전」이라고 할 때) `curl -s https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/.claude-plugin/plugin.json` 의 `version` 을 읽어 `ArtifactData update meta/main` 으로 `latest_version` · `latest_checked`("MM-DD HH:MM")를 적는다(다른 칸은 건드리지 않는다). 읽지 못하면(오프라인) 적지 않는다.
+2. **검수** (총괄판의 「업데이트 검수하기」 요청이 inbox 로 오거나, 1번에서 새 버전이 보이면 먼저 해 둔다):
+   - 최신 `dashboard.html`(`curl -s .../skills/pm-hub/dashboard.html -o <scratchpad>/new.html`), 지금 총괄판 HTML(`Artifact read` 가 저장한 파일), 지금 버전의 배포본(저장소 `git log` 에서 그 `PMHUB_VERSION` 이 든 커밋의 파일; 모르면 생략)을 준비하고 이 스킬 폴더의 `update-check.py` 를 돌린다:
+     `python -X utf8 update-check.py --new <new.html> --live <live.html> [--base <배포본.html>] --caps db,sample,artifact --out <result.json>`
+   - 점검: 스크립트 끊김(`</script>` 문자열 — 1.9.0 에서 났던 오류) · 문법 · 문서 뼈대 중복 · 권한 충돌 · 데이터(컬렉션) 변화 · 새 외부 주소 · 위험 호출 · 직접 고친 부분이 덮어써지는지.
+   - 결과(`from` · `to` · `ok` · `items`)에 `at`("MM-DD HH:MM")을 더해 `meta/main` 의 `update_check` 로 적는다(`ArtifactData update`). **`ok` 가 true 일 때만 총괄판에 「최신버전 업데이트」 단추가 나온다.** 오류가 있으면 단추 대신 「문제 발견 · 업데이트 보류」와 항목이 보인다.
+   - 스크립트가 못 보는 것(실제 화면 동작)은 대표께 한 줄로 알린다. 가능하면 새 파일을 로컬에서 열어 본다.
+3. **업데이트**: 검수 통과 뒤 단추를 두 번 누르면 화면이 직접 받아 올려 보고, 안 되면 inbox 에 업데이트 요청을 쌓는다. 요청(또는 대표의 「총괄판 업데이트」)을 받으면 PM 이 `new.html` 을 총괄판 URL 로 올린다(`url` 지정, `capabilities` 에 `db` · `sample` · `artifact` 모두; 올리기 전에 `Artifact read`). 데이터(ArtifactData)는 그대로다. inbox 를 「처리」로 바꾸고 대표께 한 줄로 알린다.
+   - 검수에서 `ok: false` 인 판은 올리지 않는다. 대표가 그래도 올리라고 하면 항목을 보여 주고 질문창으로 한 번 더 확인한다.
 - 스킬(플러그인) 파일 자체는 총괄판이 못 바꾼다 — 사용자가 터미널에서 `claude plugin marketplace update pm-hub; claude plugin update pm-hub@pm-hub` 를 한 뒤 새 세션을 연다. 대표가 물으면 이 명령을 코드 블록으로 알려 준다.
 
 ## 3-5. 「가이드」
