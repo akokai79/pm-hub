@@ -15,7 +15,7 @@ description: 메인(PM) 세션으로 일할 때 반드시 이 스킬을 쓴다. 
 
 1. 총괄판이 있는지 본다: 메모리에 `pm-hub-dashboard` 가 있으면 그 URL 을 쓴다.
 2. 없으면 이 스킬 폴더의 `dashboard.html` 을 Artifact 로 올린다.
-   - `capabilities: {"db": {"rules": [{"path": "", "read": "view", "write": "owner"}]}, "sample": {}, "artifact": {}}`, `icon: "chart"` (`sample` 은 「삭제 추천 · 추가 추천 · 해결 솔루션 가이드 · 평가하기」 버튼용: 누른 사람의 Claude 사용량을 쓴다. `artifact` 는 총괄판 맨 위 「최신버전 업데이트」 단추가 페이지를 스스로 다시 올리는 데 쓴다)
+   - `capabilities: {"db": {"rules": [{"path": "", "read": "view", "write": "owner"}]}, "sample": {}, "artifact": {}, "comments": {}}`, `icon: "chart"` (`comments` 는 「PM 에게 보내기」 가 댓글로 PM 세션을 바로 깨우는 데 쓴다 — 편집 권한이 있고 PM 세션이 열려 있을 때만 켜지고, 아니면 우편함만 쓴다. `sample` 은 「삭제 추천 · 추가 추천 · 해결 솔루션 가이드 · 평가하기」 버튼용: 누른 사람의 Claude 사용량을 쓴다. `artifact` 는 총괄판 맨 위 「최신버전 업데이트」 단추가 페이지를 스스로 다시 올리는 데 쓴다)
    - 올린 URL 을 메모리 `pm-hub-dashboard` 에 저장한다(이 대표 전용 판이다. 다른 사람의 판 URL 을 쓰지 않는다).
 3. 지금 진행 중인 프로젝트 · 하위 세션 · 대표 할 일을 읽어 첫 데이터를 채운다(아래 「총괄판 데이터」).
 4. 공통 용어(PR · 머지 · 운영 배포 · 마이그레이션 · 하위 세션 · 보관 · 아티팩트 · 워크트리 · 스킬 · 모델 · 노력)를 용어집에 넣는다.
@@ -199,7 +199,7 @@ description: 메인(PM) 세션으로 일할 때 반드시 이 스킬을 쓴다. 
    - 점검: 스크립트 끊김(`</script>` 문자열 — 1.9.0 에서 났던 오류) · 문법 · 문서 뼈대 중복 · 권한 충돌 · 데이터(컬렉션) 변화 · 새 외부 주소 · 위험 호출 · 직접 고친 부분이 덮어써지는지.
    - 결과(`from` · `to` · `ok` · `items`)에 `at`("MM-DD HH:MM")을 더해 `meta/main` 의 `update_check` 로 적는다(`ArtifactData update`). **`ok` 가 true 일 때만 총괄판에 「최신버전 업데이트」 단추가 나온다.** 오류가 있으면 단추 대신 「문제 발견 · 업데이트 보류」와 항목이 보인다.
    - 스크립트가 못 보는 것(실제 화면 동작)은 대표께 한 줄로 알린다. 가능하면 새 파일을 로컬에서 열어 본다.
-3. **업데이트**: 검수 통과 뒤 단추를 두 번 누르면 화면이 직접 받아 올려 보고, 안 되면 inbox 에 업데이트 요청을 쌓는다. 요청(또는 대표의 「총괄판 업데이트」)을 받으면 PM 이 `new.html` 을 총괄판 URL 로 올린다(`url` 지정, `capabilities` 에 `db` · `sample` · `artifact` 모두; 올리기 전에 `Artifact read`). 데이터(ArtifactData)는 그대로다. inbox 를 「처리」로 바꾸고 대표께 한 줄로 알린다.
+3. **업데이트**: 검수 통과 뒤 단추를 두 번 누르면 화면이 직접 받아 올려 보고, 안 되면 inbox 에 업데이트 요청을 쌓는다. 요청(또는 대표의 「총괄판 업데이트」)을 받으면 PM 이 `new.html` 을 총괄판 URL 로 올린다(`url` 지정, `capabilities` 에 `db` · `sample` · `artifact` · `comments` 모두; 올리기 전에 `Artifact read`). 데이터(ArtifactData)는 그대로다. inbox 를 「처리」로 바꾸고 대표께 한 줄로 알린다.
    - 검수에서 `ok: false` 인 판은 올리지 않는다. 대표가 그래도 올리라고 하면 항목을 보여 주고 질문창으로 한 번 더 확인한다.
 - 스킬(플러그인) 파일 자체는 총괄판이 못 바꾼다 — 사용자가 터미널에서 `claude plugin marketplace update pm-hub; claude plugin update pm-hub@pm-hub` 를 한 뒤 새 세션을 연다. 대표가 물으면 이 명령을 코드 블록으로 알려 준다.
 

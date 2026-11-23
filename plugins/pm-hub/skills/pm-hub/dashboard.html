@@ -386,6 +386,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
   /* ---- AI 추천 (sample) ---- */
   let SAMPLE=null,DB=null;const ADV={};
   document.addEventListener("click",e=>{const r=e.target.closest("#b-reload");if(!r)return;r.disabled=true;r.textContent="불러오는 중…";try{location.reload()}catch(_){r.disabled=false;r.textContent="↻ 새로고침 (실패 · 브라우저 새로고침을 쓰세요)"}});
+  let CM=null;(async()=>{try{CM=await window.claude.use("comments")}catch(_){CM=null}})();
   const INBOX={};
   /* PM 이 아직 안 읽은 요청(새로 · 대기) 건수 · 가장 오래된 것의 경과 시간을 맨 위에 보인다. 화면이 PM 을 깨우지 못하므로 쌓이는 것을 대표가 바로 알게 한다. */
   function renderInboxNote(){const n=$("inboxnote");if(!n)return;const un=Object.keys(INBOX).map(k=>INBOX[k]).filter(m=>m&&(m.status==="새로"||m.status==="대기"));
@@ -402,8 +403,12 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     if(!DB){b.textContent="보낼 수 없음 (저장소 없음)";return}
     b.disabled=true;b.textContent="보내는 중…";
     const id="m"+Date.now().toString(36);const d=new Date(),p=n=>String(n).padStart(2,"0");
-    try{const doc={text:b.dataset.send,status:"새로",at:p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())};if(b.dataset.ref)doc.ref=b.dataset.ref;await DB.doc("inbox/"+id).set(doc);INBOX[id]=doc;renderInboxNote();if(doc.ref)["del","add"].forEach(k=>renderAdvice(k));try{await navigator.clipboard.writeText(b.dataset.send)}catch(_){}
-      b.textContent="보냄 ✓ (PM 이 다음 턴에 처리)"}
+    /* 바로 실행: 편집 권한이 있으면 댓글로 PM 세션을 깨운다(sendToClaude). 안 되면 우편함만 쓴다. 눌린 직후(제스처)에 먼저 부른다. */
+    let live=false;
+    if(CM&&CM.sendToClaude){try{if(await CM.canSendToClaude()==="available"){const an=await CM.anchorFor(b.closest(".card")||b);
+      await CM.sendToClaude({anchor:an,text:"[총괄판 요청] "+b.dataset.send+(b.dataset.ref?" (카드 "+b.dataset.ref+")":"")+" — 우편함 문서 inbox/"+id+" 에도 같은 말이 있다. 지금 처리하고 그 문서를 받음/처리로 바꿔 줘. 삭제 · 권한 · 설정 변경은 실행 전에 대표께 질문창으로 확인."});live=true}}catch(_){}}
+    try{const doc={text:b.dataset.send,status:"새로",at:p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())};if(live)doc.via="댓글";if(b.dataset.ref)doc.ref=b.dataset.ref;await DB.doc("inbox/"+id).set(doc);INBOX[id]=doc;renderInboxNote();if(doc.ref)["del","add"].forEach(k=>renderAdvice(k));try{await navigator.clipboard.writeText(b.dataset.send)}catch(_){}
+      b.textContent=live?"보냄 ✓ (PM 을 깨웠습니다 · 바로 처리 시작)":"보냄 ✓ (PM 이 다음 턴에 처리)"}
     catch(_){b.disabled=false;b.textContent="보내지 못함 · 다시 누르기"}});
   function cfgDigest(){const c=S.config||{};const L=[];
     L.push("## CLAUDE.md (앞부분)");(c.claudemd||[]).forEach(m=>L.push("["+m.where+"]\n"+String(m.text).slice(0,3500)));
@@ -543,7 +548,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
      meta/main 의 latest_version · latest_checked 에 적어 둔다. 화면은 먼저 직접 읽어 보고(되면 바로), 안 되면 그 값을 쓴다.
      업데이트: 직접 받아 스스로 다시 올려 보고(artifact 권한), 안 되면 PM 에게 요청(inbox)을 보낸다 — PM 이 다음 턴에 올린다.
      스킬(플러그인) 파일은 이 페이지가 바꿀 수 없다 — claude plugin update pm-hub@pm-hub 를 따로 한다. */
-  const PMHUB_VERSION="1.11.0";
+  const PMHUB_VERSION="1.12.0";
   const RAW="https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/";
   const SKEL_HEAD='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
   let LATEST="",vdone=false,armed=false,updating=false,asked=false;
@@ -589,7 +594,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
       btn.textContent="올리는 중…";await art.publish(SKEL_HEAD+html+"</body></html>");done=true;
       verMsg('<div class="note">업데이트했습니다. 곧 새 화면으로 바뀝니다.</div>');
     }catch(_){
-      if(!done){btn.textContent="PM 에게 요청 보내는 중…";if(await askPM("PM 총괄판 아티팩트를 최신 버전("+L+")으로 업데이트해줘. 저장소(akokai79/pm-hub)의 최신 dashboard.html 을 받아 이 총괄판 주소에 다시 올리고, capabilities 에 db · sample · artifact 를 모두 넣어 줘. 데이터는 그대로 두고.")){sentMsg()}}
+      if(!done){btn.textContent="PM 에게 요청 보내는 중…";if(await askPM("PM 총괄판 아티팩트를 최신 버전("+L+")으로 업데이트해줘. 저장소(akokai79/pm-hub)의 최신 dashboard.html 을 받아 이 총괄판 주소에 다시 올리고, capabilities 에 db · sample · artifact · comments 를 모두 넣어 줘. 데이터는 그대로 두고.")){sentMsg()}}
     }finally{updating=false;armed=false;if(btn.isConnected){btn.disabled=false;btn.textContent="최신버전 업데이트"}}}
   document.addEventListener("click",async e=>{
     const u=e.target.closest("#b-upd");if(u){doUpdate(u);return}
