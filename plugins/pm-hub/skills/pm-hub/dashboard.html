@@ -196,7 +196,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
         <button type="button" class="btn" id="b-del">삭제 추천</button>
         <button type="button" class="btn" id="b-add">추가 추천</button>
       </div>
-      <p class="note" id="cfg-ai-note" hidden>버튼을 누르면 이 화면의 설정 목록을 Claude 에게 보내 추천을 받습니다(내 Claude 사용량을 씁니다). 페이지는 아무것도 지우거나 바꾸지 않습니다. 하고 싶은 추천은 「PM 에게 보내기」를 누르면 메인 세션이 다음 턴에 받아 처리합니다.</p>
+      <p class="note" id="cfg-ai-note" hidden>버튼을 누르면 이 화면의 설정 목록을 Claude 에게 보내 추천을 받습니다(내 Claude 사용량을 씁니다). 페이지는 아무것도 지우거나 바꾸지 않습니다. 하고 싶은 추천은 「복사」를 눌러 PM 대화창에 붙여 넣으면 PM 이 처리합니다(총괄판은 PM 을 직접 실행시키지 못합니다).</p>
       <div id="adv-del"></div><div id="adv-add"></div></section>
     <section><h2>CLAUDE.md (지침)</h2><div id="cfg-md" class="empty">–</div></section>
     <div class="grid2">
@@ -230,7 +230,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     </section>
     <div id="ev-angles"></div>
     <section id="ev-impbox" hidden><h2>보완할 점 <span class="n" id="ev-nimp"></span></h2>
-      <p class="note">「PM 에게 보내기」를 누르면 보낼 말이 메인 PM 세션이 읽는 우편함(inbox)에 쌓이고 클립보드에도 복사됩니다. PM 은 다음에 총괄판을 볼 때 읽고 검토 · 보완 · 질문창 순서로 처리합니다. 급하면 복사된 말을 PM 세션에 바로 붙여 넣으세요.</p>
+      <p class="note">「복사」를 누르면 보낼 말이 클립보드에 복사됩니다. PM 대화창에 붙여 넣으면 PM 이 검토 · 보완 · 질문창 순서로 처리합니다. 총괄판은 웹 페이지라 PM 을 직접 실행시키지 못합니다.</p>
       <div id="ev-imps" class="adv"></div></section>
   </div>
 </div>
@@ -386,30 +386,14 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
   /* ---- AI 추천 (sample) ---- */
   let SAMPLE=null,DB=null;const ADV={};
   document.addEventListener("click",e=>{const r=e.target.closest("#b-reload");if(!r)return;r.disabled=true;r.textContent="불러오는 중…";try{location.reload()}catch(_){r.disabled=false;r.textContent="↻ 새로고침 (실패 · 브라우저 새로고침을 쓰세요)"}});
-  let CM=null;(async()=>{try{CM=await window.claude.use("comments")}catch(_){CM=null}})();
-  const INBOX={};
-  /* PM 이 아직 안 읽은 요청(새로 · 대기) 건수 · 가장 오래된 것의 경과 시간을 맨 위에 보인다. 화면이 PM 을 깨우지 못하므로 쌓이는 것을 대표가 바로 알게 한다. */
-  function renderInboxNote(){const n=$("inboxnote");if(!n)return;const un=Object.keys(INBOX).map(k=>INBOX[k]).filter(m=>m&&(m.status==="새로"||m.status==="대기"));
-    if(!un.length){n.hidden=true;return}
-    let oldest=null;const now=new Date();un.forEach(m=>{const r=/^(\d\d)-(\d\d) (\d\d):(\d\d)$/.exec(String(m.at||""));if(r){const t=new Date(now.getFullYear(),+r[1]-1,+r[2],+r[3],+r[4]);if(!oldest||t<oldest)oldest=t}});
-    let age="";if(oldest){const h=(now-oldest)/3600000;age=" · 가장 오래된 것 "+(h<1?"1시간 안":h<48?Math.round(h)+"시간 전":Math.round(h/24)+"일 전")}
-    n.hidden=false;n.textContent="PM 이 아직 안 읽은 요청 "+un.length+"건"+age+" — PM 세션에 「우편함 확인」이라고 말하세요"}
-  function inboxOf(ref){let r=null;Object.keys(INBOX).forEach(k=>{const m=INBOX[k];if(m&&m.ref===ref&&(!r||String(m.at||"")>=String(r.at||"")))r=m});return r}
-  function sayBox(t,ref){if(!t)return"";const m=ref?inboxOf(ref):null;
-    if(m&&m.status!=="처리")return '<div class="say"><span>PM 에게 보낼 말: '+esc(t)+'</span><button type="button" class="btn ghost sm" disabled>'+(m.status==="받음"?"PM 이 받음 ✓ (처리 중)":"보냄 ✓ (PM 이 다음 턴에 처리)")+'</button></div>';
-    return '<div class="say"><span>PM 에게 보낼 말: '+esc(t)+'</span><button type="button" class="btn ghost sm" data-send="'+esc(t)+'"'+(ref?' data-ref="'+esc(ref)+'"':'')+'>PM 에게 보내기</button></div>'}
-  /* 「PM 에게 보내기」: inbox 컬렉션에 쌓는다. PM 세션이 매 턴 inbox(status=새로) 를 읽어 처리하고 「받음」으로 바꾼다. */
+  /* 「복사」: 웹 페이지인 총괄판은 PM 세션을 실행시킬 수 없다. 보낼 말을 클립보드에 복사하고, 대표가 PM 대화창에 붙여 넣는다. (우편함 · 댓글 방식은 1.13.0 에서 뺐다) */
+  const INBOX={};function inboxOf(){return null}function renderInboxNote(){const n=$("inboxnote");if(n)n.hidden=true}
+  function sayBox(t){if(!t)return"";return '<div class="say"><span>PM 에게 보낼 말: '+esc(t)+'</span><button type="button" class="btn ghost sm" data-send="'+esc(t)+'">복사</button></div>'}
+  async function copyText(t){let ok=false;try{await navigator.clipboard.writeText(t);ok=true}catch(_){}
+    if(!ok){try{const ta=document.createElement("textarea");ta.value=t;ta.style.cssText="position:fixed;opacity:0";document.body.appendChild(ta);ta.select();ok=document.execCommand("copy");ta.remove()}catch(_){}}return ok}
   document.addEventListener("click",async e=>{const b=e.target.closest("[data-send]");if(!b||b.disabled)return;
-    if(!DB){b.textContent="보낼 수 없음 (저장소 없음)";return}
-    b.disabled=true;b.textContent="보내는 중…";
-    const id="m"+Date.now().toString(36);const d=new Date(),p=n=>String(n).padStart(2,"0");
-    /* 바로 실행: 편집 권한이 있으면 댓글로 PM 세션을 깨운다(sendToClaude). 안 되면 우편함만 쓴다. 눌린 직후(제스처)에 먼저 부른다. */
-    let live=false;
-    if(CM&&CM.sendToClaude){try{if(await CM.canSendToClaude()==="available"){const an=await CM.anchorFor(b.closest(".card")||b);
-      await CM.sendToClaude({anchor:an,text:"[총괄판 요청 · 자동 답변은 「접수했습니다」 한 줄만 쓰고 비교 · 조사 · 판단은 하지 마세요. 실제 처리는 파일을 볼 수 있는 PM 세션이 합니다] "+b.dataset.send+(b.dataset.ref?" (카드 "+b.dataset.ref+")":"")+" — 우편함 문서 inbox/"+id+" 에도 같은 말이 있다. 지금 처리하고 그 문서를 받음/처리로 바꿔 줘. 삭제 · 권한 · 설정 변경은 실행 전에 대표께 질문창으로 확인."});live=true}}catch(_){}}
-    try{const doc={text:b.dataset.send,status:"새로",at:p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())};if(live)doc.via="댓글";if(b.dataset.ref)doc.ref=b.dataset.ref;await DB.doc("inbox/"+id).set(doc);INBOX[id]=doc;renderInboxNote();if(doc.ref)["del","add"].forEach(k=>renderAdvice(k));try{await navigator.clipboard.writeText(b.dataset.send)}catch(_){}
-      b.textContent=live?"보냄 ✓ (PM 을 깨웠습니다 · 첫 답글은 자동 응답, 실제 처리는 PM)":"보냄 ✓ (PM 이 다음 턴에 처리)"}
-    catch(_){b.disabled=false;b.textContent="보내지 못함 · 다시 누르기"}});
+    const ok=await copyText(b.dataset.send);const old=b.dataset.lab||b.textContent;b.dataset.lab=old;
+    b.textContent=ok?"복사됨 ✓ PM 대화창에 붙여 넣으세요":"복사 실패 · 글을 직접 선택해 복사하세요";setTimeout(()=>{b.textContent=old},3000)});
   function cfgDigest(){const c=S.config||{};const L=[];
     L.push("## CLAUDE.md (앞부분)");(c.claudemd||[]).forEach(m=>L.push("["+m.where+"]\n"+String(m.text).slice(0,3500)));
     L.push("## 내 스킬");(c.skills||[]).forEach(s=>L.push("- "+s.name+" ("+s.source+"): "+s.desc));
@@ -517,7 +501,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
         '<ul class="tl">'+L.map(t=>'<li><span class="m '+(t.ok===true?"ok":t.ok===false?"ng":"sk")+'">'+(t.ok===true?"✓":t.ok===false?"✗":"–")+'</span><span>'+esc(t.name)+(t.detail?' <span class="note">· '+esc(t.detail)+'</span>':"")+'</span></li>').join("")+'</ul></section>'}).join("");
     const P=(e.improvements||[]);$("ev-impbox").hidden=!P.length;$("ev-nimp").textContent=P.length+"개";
     $("ev-imps").innerHTML=P.map((x,i)=>{return '<div class="card"><div><span class="chip p-'+esc(x.priority||"중간")+'">'+esc(x.priority||"중간")+'</span> <b>'+esc(x.title||"")+'</b> <span class="tag">'+esc(angName(x.angle))+'</span></div><div>'+esc(x.why||"")+'</div>'+
-        '<div class="say"><span>PM 에게 보낼 말: '+esc(x.say||"")+'</span><button type="button" class="btn ghost sm" data-send="'+esc((x.title?x.title+' — ':'')+(x.say||''))+'">PM 에게 보내기</button></div></div>'}).join("")}
+        '<div class="say"><span>PM 에게 보낼 말: '+esc(x.say||"")+'</span><button type="button" class="btn ghost sm" data-send="'+esc((x.title?x.title+' — ':'')+(x.say||''))+'">복사</button></div></div>'}).join("")}
   $("b-eval").addEventListener("click",async e=>{
     if(!SAMPLE)return;const btn=e.currentTarget;btn.disabled=true;const label=btn.textContent;btn.textContent="평가하는 중…";
     $("ev-msg").textContent="① 자동 시험을 돌리는 중…";
@@ -548,7 +532,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
      meta/main 의 latest_version · latest_checked 에 적어 둔다. 화면은 먼저 직접 읽어 보고(되면 바로), 안 되면 그 값을 쓴다.
      업데이트: 직접 받아 스스로 다시 올려 보고(artifact 권한), 안 되면 PM 에게 요청(inbox)을 보낸다 — PM 이 다음 턴에 올린다.
      스킬(플러그인) 파일은 이 페이지가 바꿀 수 없다 — claude plugin update pm-hub@pm-hub 를 따로 한다. */
-  const PMHUB_VERSION="1.12.1";
+  const PMHUB_VERSION="1.13.0";
   const RAW="https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/";
   const SKEL_HEAD='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
   let LATEST="",vdone=false,armed=false,updating=false,asked=false;
@@ -576,11 +560,10 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     vdone=true;showVer()}
   function verMsg(html){const m=$("vermsg");m.hidden=!html;m.innerHTML=html||""}
   async function askPM(text){
-    if(!DB){verMsg('<div class="note">요청을 보낼 수 없습니다(저장소 연결 없음). 아래 말을 PM 세션에 직접 보내세요: '+esc(text)+'</div>');return false}
-    const d=new Date(),p=n=>String(n).padStart(2,"0");
-    try{await DB.doc("inbox/up"+Date.now().toString(36)).set({text,status:"새로",at:p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())});return true}
-    catch(_){verMsg('<div class="note">요청을 보내지 못했습니다. 아래 말을 PM 세션에 직접 보내세요: '+esc(text)+'</div>');return false}}
-  function sentMsg(){verMsg('<div class="card"><div>PM 에게 요청을 보냈습니다. PM 세션이 다음 턴에 처리합니다(보통 바로 다음 대화). 급하면 PM 세션에 「총괄판 업데이트」라고 말하세요.</div><div class="say"><span>스킬(플러그인) 파일도 따로 올리려면 터미널에서: <code>claude plugin update pm-hub@pm-hub</code></span><button type="button" class="btn ghost sm" data-cp="claude plugin update pm-hub@pm-hub">복사</button></div></div>')}
+    const ok=await copyText(text);
+    if(!ok){verMsg('<div class="note">복사하지 못했습니다. 아래 말을 PM 대화창에 직접 붙여 넣으세요: '+esc(text)+'</div>');return false}
+    return true}
+  function sentMsg(){verMsg('<div class="card"><div>요청 문장을 복사했습니다. PM 대화창에 붙여 넣으면 PM 이 처리합니다(총괄판은 PM 을 직접 실행시키지 못합니다).</div><div class="say"><span>스킬(플러그인) 파일도 따로 올리려면 터미널에서: <code>claude plugin update pm-hub@pm-hub</code></span><button type="button" class="btn ghost sm" data-cp="claude plugin update pm-hub@pm-hub">복사</button></div></div>')}
   async function doUpdate(btn){
     if(updating)return;
     if(!armed){armed=true;btn.textContent="정말 업데이트 (한 번 더 누르기)";setTimeout(()=>{armed=false;if(btn.isConnected&&!updating)btn.textContent="최신버전 업데이트"},7000);return}
@@ -594,12 +577,12 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
       btn.textContent="올리는 중…";await art.publish(SKEL_HEAD+html+"</body></html>");done=true;
       verMsg('<div class="note">업데이트했습니다. 곧 새 화면으로 바뀝니다.</div>');
     }catch(_){
-      if(!done){btn.textContent="PM 에게 요청 보내는 중…";if(await askPM("PM 총괄판 아티팩트를 최신 버전("+L+")으로 업데이트해줘. 저장소(akokai79/pm-hub)의 최신 dashboard.html 을 받아 이 총괄판 주소에 다시 올리고, capabilities 에 db · sample · artifact · comments 를 모두 넣어 줘. 데이터는 그대로 두고.")){sentMsg()}}
+      if(!done){btn.textContent="PM 에게 요청 보내는 중…";if(await askPM("PM 총괄판 아티팩트를 최신 버전("+L+")으로 업데이트해줘. 저장소(akokai79/pm-hub)의 최신 dashboard.html 을 받아 이 총괄판 주소에 다시 올리고, capabilities 에 db · sample · artifact 를 모두 넣어 줘. 데이터는 그대로 두고.")){sentMsg()}}
     }finally{updating=false;armed=false;if(btn.isConnected){btn.disabled=false;btn.textContent="최신버전 업데이트"}}}
   document.addEventListener("click",async e=>{
     const u=e.target.closest("#b-upd");if(u){doUpdate(u);return}
     if(e.target.closest("#b-vchk")){verMsg("");await checkVersion();const L=latestNow();verMsg('<div class="note">'+(L?"확인했습니다. 최신 번호는 "+esc(L)+" 입니다.":"이 화면에서는 저장소를 직접 읽을 수 없습니다. PM 세션이 확인해 적어 두면 여기에 나타납니다. 지금 알고 싶으면 「PM 에게 확인 요청」을 누르세요.")+'</div>');return}
-    const uk=e.target.closest("#b-ucheck");if(uk){uk.disabled=true;if(await askPM("총괄판 업데이트를 검수해줘: 지금 "+PMHUB_VERSION+" → 최신 "+latestNow()+". 저장소(akokai79/pm-hub)의 최신 dashboard.html 을 받아 update-check.py 로 오류 · 충돌 가능성을 점검하고, 결과를 meta/main 의 update_check(from · to · ok · items · at)에 적어 줘. 이상이 없을 때만 업데이트 단추가 나오게 돼 있어."))verMsg('<div class="card"><div>검수 요청을 PM 에게 보냈습니다. PM 세션이 다음 턴에 점검하고, 결과가 이 자리에 나타납니다. 급하면 PM 세션에 「총괄판 업데이트 검수」라고 말하세요.</div></div>');uk.disabled=false;return}
+    const uk=e.target.closest("#b-ucheck");if(uk){uk.disabled=true;if(await askPM("총괄판 업데이트를 검수해줘: 지금 "+PMHUB_VERSION+" → 최신 "+latestNow()+". 저장소(akokai79/pm-hub)의 최신 dashboard.html 을 받아 update-check.py 로 오류 · 충돌 가능성을 점검하고, 결과를 meta/main 의 update_check(from · to · ok · items · at)에 적어 줘. 이상이 없을 때만 업데이트 단추가 나오게 돼 있어."))verMsg('<div class="card"><div>검수 요청 문장을 복사했습니다. PM 대화창에 붙여 넣으면 PM 이 점검하고, 결과가 이 자리에 나타납니다.</div></div>');uk.disabled=false;return}
     const k=e.target.closest("#b-vask");if(k){k.disabled=true;if(await askPM("PM 총괄판의 최신 버전을 확인해 알려 주고, 새 버전이 있으면 총괄판을 업데이트해줘. (저장소 akokai79/pm-hub 의 plugin.json 번호를 meta/main latest_version 에 적어 줘)"))sentMsg();k.disabled=false;return}
     const c=e.target.closest("[data-cp]");if(!c)return;
     try{await navigator.clipboard.writeText(c.dataset.cp);c.textContent="복사됨"}catch(_){c.textContent="복사하지 못함"}
@@ -620,7 +603,6 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     db.doc("ctl/main").onSnapshot(s=>{S.ctl=s.exists?s.data():null;renderAll()},onErr);
     DB=db;
     db.doc("eval/main").onSnapshot(s=>{S.eval=s.exists?s.data():null;renderEval()},()=>{});
-    db.collection("inbox").onSnapshot(q=>{Object.keys(INBOX).forEach(k=>delete INBOX[k]);q.docs.forEach(d=>{INBOX[d.id]=d.data()});renderInboxNote();["del","add"].forEach(k=>renderAdvice(k))},()=>{});
     ["del","add","ctl"].forEach(k=>db.doc("advice/"+k).onSnapshot(s=>{if(s.exists){ADV[k]=s.data();renderAdvice(k)}},()=>{}));
     let sp=null;try{sp=await window.claude.use("sample")}catch(_){sp=null}
     if(sp){SAMPLE=sp;$("b-eval").hidden=false;["cfg-btns","cfg-ai-note"].forEach(id=>$(id).hidden=false);renderCtl()}
