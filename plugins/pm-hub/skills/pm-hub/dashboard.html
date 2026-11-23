@@ -368,7 +368,9 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     $("cfg-other").innerHTML=Object.entries(o).map(([k,v])=>'<tr><th>'+esc(k)+'</th><td class="cmd">'+esc(v===""?"없음":v)+'</td></tr>').join("");
   }
   function renderCtl(){
-    const c=S.ctl;if(!c)return;const it=c.items||[];
+    const c=S.ctl;const it=(c&&c.items)||[];const has=it.length>0;
+    $("ctl-btns").hidden=$("ctl-ai-note").hidden=!(has&&SAMPLE);
+    if(!c||!has){$("ctl-src").textContent="점검 항목 목록이 아직 없습니다. 점검 기준(목록)이 있을 때 PM 에게 「AI 통제 갱신」이라고 하면 채워집니다. (목록이 없는 사람은 이 탭을 쓰지 않아도 됩니다.)";$("ctl-areas").innerHTML="";return}
     $("ctl-title").firstChild.textContent=(c.title||"AI 통제 점검")+" ";
     $("ctl-when").textContent=c.updated||"";
     const cnt=st=>it.filter(i=>(i.status||"미점검")===st).length;
@@ -407,7 +409,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     ctl:()=>{const it=((S.ctl||{}).items||[]).filter(i=>i.status!=="충족");return "아래는 한 조직의 AI 통제 점검 결과 중 「없음」 · 「부분 충족」 항목이다. 항목마다 충족으로 만드는 해결 가이드를 써라: 순서대로 할 일 3~5개, 걸리는 시간(시간 단위), 오늘 바로 할 수 있는 작은 첫 걸음. 규정 원문(ISO 등)을 베끼지 말고 이 조직 메모에 맞춰 구체적으로 써라. "+RULE+"\n\n답은 JSON 배열 하나만: [{\"code\":\"항목 번호\",\"summary\":\"한 줄 요약\",\"steps\":[\"할 일\"],\"hours\":숫자,\"first\":\"오늘 할 첫 걸음\",\"say\":\"메인 PM 세션에 보낼 한 문장 지시\"}]\n\n"+it.map(i=>"- "+i.code+" ["+i.status+"] "+i.q+" / 메모: "+(i.note||"")).join("\n")}
   };
   function renderAdvice(kind){const a=ADV[kind];const box=$("adv-"+kind);if(!box)return;
-    if(kind==="ctl"){renderCtl();if(!a){box.innerHTML="";return}box.innerHTML='<div class="adv"><h3>해결 솔루션 가이드 <span class="n">'+esc(a.at||"")+' · 각 항목 아래에 붙였습니다</span></h3></div>';return}
+    if(kind==="ctl"){renderCtl();if(!a||!Array.isArray(a.items)||!a.items.length){box.innerHTML="";return}box.innerHTML='<div class="adv"><h3>해결 솔루션 가이드 <span class="n">'+esc(a.at||"")+' · 각 항목 아래에 붙였습니다</span></h3></div>';return}
     if(!a||!Array.isArray(a.items)){box.innerHTML="";return}
     const title=kind==="del"?"삭제 추천":"추가 추천";
     box.innerHTML='<div class="adv"><h3>'+title+' <span class="n">'+esc(a.at||"")+' · '+a.items.length+'개</span></h3>'+a.items.map(x=>'<div class="card"><div><span class="chip r-'+esc(x.risk||"중간")+'">위험 '+esc(x.risk||"?")+'</span> <b>'+esc(x.target||x.title||"")+'</b> <span class="tag">'+esc(x.kind||"")+'</span></div><div>'+esc(x.why||"")+'</div>'+(x.benefit?'<div class="note">'+esc(x.benefit)+'</div>':'')+sayBox(x.say)+'</div>').join("")+'</div>'}
@@ -525,7 +527,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
      meta/main 의 latest_version · latest_checked 에 적어 둔다. 화면은 먼저 직접 읽어 보고(되면 바로), 안 되면 그 값을 쓴다.
      업데이트: 직접 받아 스스로 다시 올려 보고(artifact 권한), 안 되면 PM 에게 요청(inbox)을 보낸다 — PM 이 다음 턴에 올린다.
      스킬(플러그인) 파일은 이 페이지가 바꿀 수 없다 — claude plugin update pm-hub@pm-hub 를 따로 한다. */
-  const PMHUB_VERSION="1.9.2";
+  const PMHUB_VERSION="1.9.3";
   const RAW="https://raw.githubusercontent.com/akokai79/pm-hub/main/plugins/pm-hub/";
   const SKEL_HEAD='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
   let LATEST="",vdone=false,armed=false,updating=false,asked=false;
@@ -590,7 +592,7 @@ td.cmd{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;min-width:2
     db.doc("eval/main").onSnapshot(s=>{S.eval=s.exists?s.data():null;renderEval()},()=>{});
     ["del","add","ctl"].forEach(k=>db.doc("advice/"+k).onSnapshot(s=>{if(s.exists){ADV[k]=s.data();renderAdvice(k)}},()=>{}));
     let sp=null;try{sp=await window.claude.use("sample")}catch(_){sp=null}
-    if(sp){SAMPLE=sp;$("b-eval").hidden=false;["cfg-btns","ctl-btns","cfg-ai-note","ctl-ai-note"].forEach(id=>$(id).hidden=false)}
+    if(sp){SAMPLE=sp;$("b-eval").hidden=false;["cfg-btns","cfg-ai-note"].forEach(id=>$(id).hidden=false);renderCtl()}
     ["projects","tasks","asks","sessions","glossary","log"].forEach(c=>{
       db.collection(c).onSnapshot(q=>{S[c]=q.docs.map(d=>Object.assign({id:d.id},d.data()));fresh(q.metadata);renderAll()},onErr);
     });
